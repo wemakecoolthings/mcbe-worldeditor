@@ -1,7 +1,7 @@
 # Minecraft Bedrock World Editor
 A free-to-use Minecraft Bedrock worldedit addon made by WMCT! This tool was made to be put onto any server / world with little-to-no issues. 
 
-In order to get started, give yourself a **blaze powder** with the **worldeditor** tag. Right clicking the blaze powder will activate it!
+In order to get started, give yourself a **blaze powder** with the **worldeditor** tag. Right clicking the blaze powder will activate it! Everything is kept within a behavior pack, no resources required!
 
 Current Features
 - Position Saving
