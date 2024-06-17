@@ -3,7 +3,7 @@ A free-to-use Minecraft Bedrock worldedit addon made by WMCT! This tool was made
 
 # This project is still under development so please read the available functions. You may encounter bugs with this behavior pack.
 
-In order to get started, give yourself a **blaze powder** with the **worldeditor** tag. Right clicking the blaze powder will activate it! Everything is kept within a behavior pack, no resources required!
+In order to get started, give yourself a **blaze powder** with the **worldeditor** tag. Right clicking the blaze powder will activate it!
 
 Current Features
 - Position Saving
