@@ -29,6 +29,7 @@ function worldeditorMenu(player) {
 	form.button(`§a§l> §0§lNavigation Commands`)
 	form.button(`§a§l> §0§lTerrain Commands`)
 	form.button(`§a§l> §0§lShapes Commands`)
+	form.button(`§a§l> §0§lInfo Commands`)
 	form.button(`§a§l> §0§lMask`)
 	form.button(`§a§l> §0§lUndo`)
 	form.button(`§a§l> §0§lRedo`)
@@ -52,12 +53,12 @@ function worldeditorMenu(player) {
 				if (response.selection == 0) {
 					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
 				} else if (response.selection == 1) {
-					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe,);
+					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
 				}
 
 			})
 
-		} else if (response.selection == 4) {
+		} else if (response.selection == 6) {
 			maskLib.setMask(player)
 		}
 	})
@@ -115,8 +116,14 @@ function toggleEvents() {
 
 	const eventInt = world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
 		if (ev.player.hasTag("worldeditor") && (ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")) && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
+			
+			let blockPerm = ev.block.permutation
+			if(ev.player.isSneaking){
+				blockPerm = "minecraft:air"
+			}
+			
 			interactCD.add(ev.player.id)
-			blockset.setPickBlock(ev.player, ev.block.permutation)
+			blockset.setPickBlock(ev.player, blockPerm)
 
 			system.runTimeout(() => {
 				interactCD.delete(ev.player.id)

@@ -44,14 +44,14 @@ export function setBlockReplaceMenu(player, pos1, pos2, exe){
             form.textField("Block To Set ID: ", "")
             form.show(player).then(response => {
                 if(!response.canceled){
-                    let toReplace = [response.formValues[0]];
+                    let toReplace = response.formValues[0];
                     let block = response.formValues[1];
-                    setBlock(player, block, pos1, pos2, exe, toReplace);
+                    setBlock(player, block, pos1, pos2, exe, "replace_block", toReplace);
                 }
             })
         } else if(response.selection == 1){
             player.addTag("record_replace");
-            player.sendMessage(`§dPick a block to §aset §dby right clicking with your axe!`);
+            player.sendMessage(`§dPick a replace block!\nSneak to grab air!`);
         }
     })
 }
@@ -67,16 +67,16 @@ export function setPickBlock(player, blockPermutation){
             pickBlock.set(player.id, blockPermutation)    
             player.addTag("record_final")     
             player.removeTag("record_replace");
-            player.sendMessage(`§dPick a second block to §areplace §dby right clicking with your axe!`);
+            player.sendMessage(`§dPick a block to set!`);
         } else if(player.hasTag("record_final")){
             let block1 = pickBlock.get(player.id)   
-            setBlock(player, block1, editor.pos1.get(player.id), editor.pos2.get(player.id), editor.exe, blockPermutation); 
+            setBlock(player, blockPermutation, editor.pos1.get(player.id), editor.pos2.get(player.id), editor.exe, "replace_perm", block1); 
             player.removeTag("record_final")     
         }
     })
 }
 
-async function setBlock(player, block, pos1, pos2, exe, isReplace = "none"){
+async function setBlock(player, block, pos1, pos2, exe, isReplace = "none", replaceBlock = ""){
 
     const startPos = player.location;
     const p1 = pos1
@@ -143,6 +143,7 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none"){
 
     let loaded = 0;
     let chunkLoad = 0;
+    let replaceCounter = 0;
     const chunkLimit = 1000000;
 
     // Ensure initial chunks are loaded
@@ -157,7 +158,12 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none"){
 
                 loaded += blockVolume.getCapacity();
                 chunkLoad += blockVolume.getCapacity();
-                player.onScreenDisplay.setActionBar(`§dLoading block sections... §7§o[${loaded}/${totalBlocks}]`);
+
+                if(replaceCounter > 0){
+                    player.onScreenDisplay.setActionBar(`§dLoading block sections... §7§o[${loaded}/${totalBlocks}] §l[${replaceCounter} Replaced]`);
+                } else {
+                    player.onScreenDisplay.setActionBar(`§dLoading block sections... §7§o[${loaded}/${totalBlocks}]`);
+                }
 
                 // Ensure newer chunks are loaded
                 if(chunkLoad > chunkLimit){
@@ -166,10 +172,12 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none"){
                 }
 
                 // Fill Blocks
-                if(isReplace != "none" && typeof isReplace == "string"){
-                    exe.fillBlocks(blockVolume, block, {ignoreChunkBoundErrors: true, blockFilter: {includeTypes: [isReplace]}});
-                } else if(isReplace != "none" && typeof isReplace != "string"){
-                    exe.fillBlocks(blockVolume, block, {ignoreChunkBoundErrors: true, blockFilter: {includePermutations: [isReplace]}});
+                if(isReplace == "replace_perm"){
+                    replaceCounter += exe.getBlocks(blockVolume, {includePermutations: [replaceBlock]}, true).getCapacity();
+                    exe.fillBlocks(blockVolume, block, {ignoreChunkBoundErrors: true, blockFilter: {includePermutations: [replaceBlock]}});
+                } else if(isReplace == "replace_block"){
+                    replaceCounter += exe.getBlocks(blockVolume, {includeTypes: [replaceBlock]}, true).getCapacity();
+                    exe.fillBlocks(blockVolume, block, {ignoreChunkBoundErrors: true, blockFilter: {includeTypes: [replaceBlock]}});
                 } else if(maskLib.mask.has(player.id)){ // Check for mask
                     exe.fillBlocks(blockVolume, block, {ignoreChunkBoundErrors: true, blockFilter: {includeTypes: [maskLib.mask.get(player.id)]}});
                 } else {
@@ -180,11 +188,16 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none"){
 
             player.teleport(startPos);
             exe.runCommand(`inputpermission set "${player.name}" movement enabled`) // Resume Movement
-            player.sendMessage(`§dFinished Block Load §7§o[${loaded}/${totalBlocks}]`);
+
+            if(replaceCounter > 0){
+                player.sendMessage(`§dFinished Block Load §7§o[${loaded}/${totalBlocks}] §l[${replaceCounter} ${replaceBlock}]`);
+            } else {
+                player.sendMessage(`§dFinished Block Load §7§o[${loaded}/${totalBlocks}]`);
+            }
         } catch(e){
             player.teleport(startPos);
             exe.runCommand(`inputpermission set "${player.name}" movement enabled`) // Resume Movement
-            player.sendMessage(`§cAn error occured while loading blocks.`);
+            player.sendMessage(`§cAn error occured while loading blocks: ${e}`);
         }
     })
 }
