@@ -3,7 +3,7 @@ A free-to-use Minecraft Bedrock worldedit addon made by WMCT! This tool was made
 
 # This project is still under development so please read the available functions. You may encounter bugs with this behavior pack.
 
-In order to get started, give yourself a **blaze powder** with the **worldeditor** tag. Right clicking the blaze powder will activate it!
+In order to get started, give yourself a **World Editor** (use /give @s we:world_editor) with the **worldeditor** tag. Right clicking the World Editor will activate it!
 
 Current Features
 - Position Saving
@@ -11,8 +11,8 @@ Current Features
 - Pick Block
 - Mask
 - Pack is disabled by default for performance
-  - Enabled by clicking the blaze powder
-  - Disabled via the menu opened by the blaze powder
+  - Enabled by clicking the World Editor
+  - Disabled via the menu opened by the World Editor
 
 Features To-Do List:
 - Support for block permutations
