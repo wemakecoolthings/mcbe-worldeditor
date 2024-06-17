@@ -1,0 +1,11 @@
+{
+	"texture_data": {
+		"world_editor": {
+			"textures": [
+				"textures/items/world_editor"
+			]
+		}
+	},
+	"resource_pack_name": "World Edit",
+	"texture_name": "atlas.items"
+}

@@ -21,8 +21,8 @@ exe.runCommand(`tag @a remove record_replace`)
 exe.runCommand(`tag @a remove record_final`)
 
 // Main Menu
-function worldeditorMenu(player){
-    let form = new ActionFormData();
+function worldeditorMenu(player) {
+	let form = new ActionFormData();
 	form.title("§d§lWorld Editor Commands")
 	form.button(`§a§l> §0§lBlock Set Commands`)
 	form.button(`§a§l> §0§lStructure Commands`)
@@ -31,44 +31,44 @@ function worldeditorMenu(player){
 	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lMask`)
 	form.button(`§a§l> §0§lUndo`)
-    form.button(`§a§l> §0§lRedo`)
+	form.button(`§a§l> §0§lRedo`)
 	form.button(`§a§l> §0§lDisable World Editor`)
 	form.show(player).then(response => {
 
-		if(response.selection == 0){
+		if (response.selection == 0) {
 			let form = new ActionFormData();
 			form.title("§d§lWorld Editor Commands")
 			form.button(`§a§l> §0§lSet Block`)
 			form.button(`§a§l> §0§lReplace Block`)
 			form.show(player).then(response => {
 
-				if(!response.canceled){
-					if(!pos1.has(player.id) || !pos2.has(player.id)){
+				if (!response.canceled) {
+					if (!pos1.has(player.id) || !pos2.has(player.id)) {
 						player.sendMessage(`§aYou must select two valid positions before using commands.`)
 						return;
 					}
 				}
 
-				if(response.selection == 0){
+				if (response.selection == 0) {
 					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
-				} else if(response.selection == 1){
-					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe, );
+				} else if (response.selection == 1) {
+					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe,);
 				}
 
 			})
 
-		} else if(response.selection == 4){
+		} else if (response.selection == 4) {
 			maskLib.setMask(player)
 		}
-    })
+	})
 }
 
 // Axe & Main Command Menu
 world.afterEvents.itemUse.subscribe(ev => {
-	if(ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("blaze_powder") && toggle == 1){
+	if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 1) {
 		ev.source.playSound("random.pop")
 		worldeditorMenu(ev.source);
-	} else if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("blaze_powder") && toggle == 0) {
+	} else if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 0) {
 		toggle = 1;
 		toggleEvents()
 		exe.runCommand(`clear "${ev.source.name}" wooden_axe`)
@@ -78,19 +78,19 @@ world.afterEvents.itemUse.subscribe(ev => {
 })
 
 system.beforeEvents.watchdogTerminate.subscribe(ev => [
-    ev.cancel = true
+	ev.cancel = true
 ])
 
 // Axe Functionality
 let interactCD = new Set(); // To prevent extra detections
-function toggleEvents(){
+function toggleEvents() {
 
 	const eventBreak = world.beforeEvents.playerBreakBlock.subscribe(ev => {
-		if(ev.player.hasTag("worldeditor") && ev.itemStack?.typeId.includes("wooden_axe")){
+		if (ev.player.hasTag("worldeditor") && ev.itemStack?.typeId.includes("wooden_axe")) {
 
-			let loc = {x: ev.block.x, y: ev.block.y, z: ev.block.z}
+			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos1.set(ev.player.id, loc);
-			if(pos2.has(ev.player.id)){
+			if (pos2.has(ev.player.id)) {
 
 				let loc2 = pos2.get(ev.player.id);
 				let max1 = Math.max(loc.x, loc2.x);
@@ -109,12 +109,12 @@ function toggleEvents(){
 				ev.player.sendMessage(`§aPos 1 set to §d${loc.x} ${loc.y} ${loc.z}`)
 			}
 
-            ev.cancel = true;
+			ev.cancel = true;
 		}
-    })
+	})
 
-    const eventInt = world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
-        if(ev.player.hasTag("worldeditor") && (ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")) && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")){
+	const eventInt = world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
+		if (ev.player.hasTag("worldeditor") && (ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")) && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
 			interactCD.add(ev.player.id)
 			blockset.setPickBlock(ev.player, ev.block.permutation)
 
@@ -122,13 +122,13 @@ function toggleEvents(){
 				interactCD.delete(ev.player.id)
 			}, 5)
 
-            ev.cancel = true;
-		} else if(ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")){
+			ev.cancel = true;
+		} else if (ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
 			interactCD.add(ev.player.id)
-			let loc = {x: ev.block.x, y: ev.block.y, z: ev.block.z}
+			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos2.set(ev.player.id, loc);
 
-			if(pos1.has(ev.player.id)){
+			if (pos1.has(ev.player.id)) {
 				let loc2 = pos1.get(ev.player.id);
 				let max1 = Math.max(loc.x, loc2.x);
 				let max2 = Math.max(loc.y, loc2.y);
@@ -150,10 +150,10 @@ function toggleEvents(){
 				interactCD.delete(ev.player.id)
 			}, 5)
 
-            ev.cancel = true;
+			ev.cancel = true;
 		}
-    })
+	})
 
 	events.set(1, eventBreak)
-    events.set(2, eventInt)
+	events.set(2, eventInt)
 }

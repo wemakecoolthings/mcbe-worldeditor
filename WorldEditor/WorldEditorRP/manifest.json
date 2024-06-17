@@ -1,0 +1,29 @@
+{
+	"format_version": 2,
+	"header": {
+		"name": "World Edit RP",
+		"made by beanrollup": "Created by WMCT",
+		"uuid": "4761e989-4cd2-4a69-8877-1fd1761ec76f",
+		"version": [
+			1,
+			0,
+			0
+		],
+		"min_engine_version": [
+			1,
+			20,
+			0
+		]
+	},
+	"modules": [
+		{
+			"type": "resources",
+			"uuid": "4c4df7d1-8141-4682-a44a-b3da12608ed5",
+			"version": [
+				1,
+				0,
+				0
+			]
+		}
+	]
+}

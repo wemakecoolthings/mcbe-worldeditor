@@ -384,7 +384,7 @@ function worldeditorMenu(player){
 						})
 					} else if(response.selection == 3){
 						brushMode.add(player.id);
-						player.sendMessage(`§aRight click blaze powder to use brush\n§aCrouch + right click to disable brush mode`)
+						player.sendMessage(`§aRight click the World Editor to use brush\n§aCrouch + right click to disable brush mode`)
 					}
 				})
 			} else if(response.selection == 6){
