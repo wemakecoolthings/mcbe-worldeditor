@@ -1,7 +1,7 @@
 # Minecraft Bedrock World Editor
 A free-to-use Minecraft Bedrock worldedit addon made by WMCT! This tool was made to be put onto any server / world with little-to-no issues. 
 
-# This project is still under development so please read the available functions. You may encounter bugs with this behavior pack.
+# This project is still under development so please read the available functions. You may encounter bugs with this pack.
 
 In order to get started, give yourself a **World Editor** (use /give @s we:world_editor) with the **worldeditor** tag. Right clicking the World Editor will activate it!
 
