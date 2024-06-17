@@ -14,36 +14,50 @@ export let events = new Map();
 // Toggle Tracker
 let toggle = 0;
 
+// Reset Players
+exe.runCommand(`inputpermission set @a movement enabled`)
+exe.runCommand(`tag @a remove record`)
+exe.runCommand(`tag @a remove record_replace`)
+exe.runCommand(`tag @a remove record_final`)
+
 // Main Menu
 function worldeditorMenu(player){
     let form = new ActionFormData();
 	form.title("§d§lWorld Editor Commands")
-	form.button(`§a§l> §0§lSet`)
-	form.button(`§a§l> §0§lReplace`)
-    form.button(`§a§l> §0§lMask`)
-	form.button(`§a§l> §0§lShapes`)
-    form.button(`§a§l> §0§lTerrain`)
-    form.button(`§a§l> §0§lStructures`)
+	form.button(`§a§l> §0§lBlock Set Commands`)
+	form.button(`§a§l> §0§lStructure Commands`)
+	form.button(`§a§l> §0§lNavigation Commands`)
+	form.button(`§a§l> §0§lTerrain Commands`)
+	form.button(`§a§l> §0§lShapes Commands`)
+	form.button(`§a§l> §0§lMask`)
 	form.button(`§a§l> §0§lUndo`)
     form.button(`§a§l> §0§lRedo`)
 	form.button(`§a§l> §0§lDisable World Editor`)
 	form.show(player).then(response => {
 
-		if(!response.canceled){
-            let positionRequired = [0, 1, 4, 5]
-            for(let i = 0; i < positionRequired.length; i++){
-                if(positionRequired[i]){
-                    if(!pos1.has(player.id) || !pos2.has(player.id)){
-                        player.sendMessage(`§aYou must select two valid positions before using commands.`)
-                        return;
-                    }
-                }
-            }
-		}
-
 		if(response.selection == 0){
-			blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
-		} else if(response.selection == 2){
+			let form = new ActionFormData();
+			form.title("§d§lWorld Editor Commands")
+			form.button(`§a§l> §0§lSet Block`)
+			form.button(`§a§l> §0§lReplace Block`)
+			form.show(player).then(response => {
+
+				if(!response.canceled){
+					if(!pos1.has(player.id) || !pos2.has(player.id)){
+						player.sendMessage(`§aYou must select two valid positions before using commands.`)
+						return;
+					}
+				}
+
+				if(response.selection == 0){
+					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
+				} else if(response.selection == 1){
+					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe, );
+				}
+
+			})
+
+		} else if(response.selection == 4){
 			maskLib.setMask(player)
 		}
     })
@@ -100,8 +114,16 @@ function toggleEvents(){
     })
 
     const eventInt = world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
-        if(ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")){
+        if(ev.player.hasTag("worldeditor") && (ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")) && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")){
+			interactCD.add(ev.player.id)
+			blockset.setPickBlock(ev.player, ev.block.permutation)
 
+			system.runTimeout(() => {
+				interactCD.delete(ev.player.id)
+			}, 5)
+
+            ev.cancel = true;
+		} else if(ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")){
 			interactCD.add(ev.player.id)
 			let loc = {x: ev.block.x, y: ev.block.y, z: ev.block.z}
 			pos2.set(ev.player.id, loc);
