@@ -1,4 +1,4 @@
-import { world, system } from '@minecraft/server';
+import { world, system, Block, BlockType } from '@minecraft/server';
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as blockset from './blockset'
 import * as maskLib from './mask'
@@ -7,6 +7,7 @@ import * as maskLib from './mask'
 export let pos1 = new Map();
 export let pos2 = new Map();
 export let exe = world.getDimension("overworld")
+export let pickBlock = 0;
 
 // Manage Active Events
 export let events = new Map();
@@ -24,19 +25,19 @@ exe.runCommand(`tag @a remove record_final`)
 function worldeditorMenu(player) {
 	let form = new ActionFormData();
 	form.title("§d§lWorld Editor Commands")
-	form.button(`§a§l> §0§lBlock Set Commands`)
-	form.button(`§a§l> §0§lStructure Commands`)
-	form.button(`§a§l> §0§lNavigation Commands`)
-	form.button(`§a§l> §0§lTerrain Commands`)
-	form.button(`§a§l> §0§lShapes Commands`)
-	form.button(`§a§l> §0§lInfo Commands`)
 	form.button(`§a§l> §0§lMask`)
 	form.button(`§a§l> §0§lUndo`)
 	form.button(`§a§l> §0§lRedo`)
+	form.button(`§a§l> §0§lBlock Set Commands`)
+	form.button(`§a§l> §0§lStructure Commands`)
+	form.button(`§a§l> §0§lTerrain Commands`)
+	form.button(`§a§l> §0§lShapes Commands`)
+	form.button(`§a§l> §0§lNavigation Commands`)
+	form.button(`§a§l> §0§lInfo Commands`)
 	form.button(`§a§l> §0§lDisable World Editor`)
 	form.show(player).then(response => {
 
-		if (response.selection == 0) {
+		if (response.selection == 3) {
 			let form = new ActionFormData();
 			form.title("§d§lWorld Editor Commands")
 			form.button(`§a§l> §0§lSet Block`)
@@ -58,15 +59,47 @@ function worldeditorMenu(player) {
 
 			})
 
-		} else if (response.selection == 6) {
-			maskLib.setMask(player)
+		} else if (response.selection == 0) {
+			maskLib.sendMaskMenu(player)
+		} else if(response.selection == 9){
+			toggle = 0;
+			player.sendMessage(`§cWorld Editor Disabled`)
+			world.beforeEvents.playerBreakBlock.unsubscribe(events.get(1))
+			world.beforeEvents.playerInteractWithBlock.unsubscribe(events.get(2))
 		}
 	})
 }
 
+export function setPickBlock(num){
+	pickBlock = num;
+}
+
 // Axe & Main Command Menu
 world.afterEvents.itemUse.subscribe(ev => {
-	if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 1) {
+	if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 1 && pickBlock != 0) {
+		
+		if(ev.source.isSneaking){
+			blockset.resetPermRecord(ev.source)
+			ev.source.sendMessage(`§cSelection undone.`)
+			return;
+		}
+		
+		let block = ev.source.getBlockFromViewDirection({includeLiquidBlocks: true, includePassableBlocks: true, maxDistance: 6})
+		if(block == undefined){
+			block = "minecraft:air"
+		} else {
+			block = block.block.permutation
+		}
+		let blockPerm = block
+
+		if(pickBlock == 1){
+			blockset.setPickBlock(ev.source, blockPerm)
+		} else if(pickBlock == 2){
+			maskLib.setMask(ev.source, blockPerm)
+			pickBlock = 0;
+		}
+
+	} else if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 1) {
 		ev.source.playSound("random.pop")
 		worldeditorMenu(ev.source);
 	} else if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 0) {
@@ -87,7 +120,8 @@ let interactCD = new Set(); // To prevent extra detections
 function toggleEvents() {
 
 	const eventBreak = world.beforeEvents.playerBreakBlock.subscribe(ev => {
-		if (ev.player.hasTag("worldeditor") && ev.itemStack?.typeId.includes("wooden_axe")) {
+		let checkRecord = ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")
+		if (ev.player.hasTag("worldeditor") && ev.itemStack?.typeId.includes("wooden_axe") && checkRecord == false) {
 
 			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos1.set(ev.player.id, loc);
@@ -115,22 +149,8 @@ function toggleEvents() {
 	})
 
 	const eventInt = world.beforeEvents.playerInteractWithBlock.subscribe(ev => {
-		if (ev.player.hasTag("worldeditor") && (ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")) && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
-			
-			let blockPerm = ev.block.permutation
-			if(ev.player.isSneaking){
-				blockPerm = "minecraft:air"
-			}
-			
-			interactCD.add(ev.player.id)
-			blockset.setPickBlock(ev.player, blockPerm)
-
-			system.runTimeout(() => {
-				interactCD.delete(ev.player.id)
-			}, 5)
-
-			ev.cancel = true;
-		} else if (ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
+		let checkRecord = ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")
+		if (checkRecord == false && ev.player.hasTag("worldeditor") && !interactCD.has(ev.player.id) && ev.itemStack?.typeId.includes("wooden_axe")) {
 			interactCD.add(ev.player.id)
 			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos2.set(ev.player.id, loc);
