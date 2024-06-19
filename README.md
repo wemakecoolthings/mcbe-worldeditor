@@ -12,6 +12,7 @@ Current Features
 - Pick Block
 - Mask
 - Undo
+- Redo
 - Pack is disabled by default for performance
   - Enabled by clicking the World Editor
   - Disabled via the menu opened by the World Editor
@@ -35,7 +36,6 @@ Features To-Do List:
 - Drain
 - Snow
 - Thaw
-- Redo
 - Copy
 - Paste
 - Cut
