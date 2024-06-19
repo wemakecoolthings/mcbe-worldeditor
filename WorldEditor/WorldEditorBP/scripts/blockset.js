@@ -2,7 +2,7 @@ import { system, BlockVolume } from '@minecraft/server';
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as maskLib from './mask'
 import * as editor from './main'
-import * as undoManager from './undo'
+import * as undoManager from './actionSave'
 
 const blockFillLimit = 32768
 let pickBlock = new Map();
