@@ -2,7 +2,7 @@ import { world, system, Block, BlockType } from '@minecraft/server';
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as blockset from './blockset'
 import * as maskLib from './mask'
-import * as undoManager from './undo'
+import * as actionManager from './actionSave'
 
 // Save Positions
 export let pos1 = new Map();
@@ -23,11 +23,10 @@ exe.runCommand(`inputpermission set @a movement enabled`)
 function worldeditorMenu(player) {
 	let form = new ActionFormData();
 	form.title("§d§lWorld Editor Commands")
-	form.button(`§a§l> §0§lMask`)
-	form.button(`§a§l> §0§lUndo`)
-	form.button(`§a§l> §0§lRedo`)
 	form.button(`§a§l> §0§lBlock Set Commands`)
 	form.button(`§a§l> §0§lStructure Commands`)
+	form.button(`§a§l> §0§lSelection Commands`)
+	form.button(`§a§l> §0§lBrush Commands`)
 	form.button(`§a§l> §0§lTerrain Commands`)
 	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lNavigation Commands`)
@@ -36,19 +35,14 @@ function worldeditorMenu(player) {
 	form.show(player).then(response => {
 
 		if (response.selection == 0) {
-			maskLib.sendMaskMenu(player)
-		} else if (response.selection == 1){
-			undoManager.revertAction(player);
-		} else if (response.selection == 2){
-			
-		} else if (response.selection == 3) {
 			let form = new ActionFormData();
 			form.title("§d§lWorld Editor Commands")
 			form.button(`§a§l> §0§lSet Block`)
 			form.button(`§a§l> §0§lReplace Block`)
+			form.button(`§c§l> §0§lBack`)
 			form.show(player).then(response => {
 
-				if (!response.canceled) {
+				if (!response.canceled && response.selection != 2) {
 					if (!pos1.has(player.id) || !pos2.has(player.id)) {
 						player.sendMessage(`§aYou must select two valid positions before using commands.`)
 						return;
@@ -59,10 +53,41 @@ function worldeditorMenu(player) {
 					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
 				} else if (response.selection == 1) {
 					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
+				} else if (response.selection == 2) {
+					worldeditorMenu(player)
 				}
 
 			})
 
+		} else if (response.selection == 1){
+			let form = new ActionFormData();
+			form.title("§d§lWorld Editor Commands")
+			form.button(`§a§l> §0§lUndo`)
+			form.button(`§a§l> §0§lRedo`)
+			form.button(`§c§l> §0§lBack`)
+			form.show(player).then(response => {
+				if(response.selection == 0){
+					actionManager.revertAction(player);
+				} else if (response.selection == 1){
+					actionManager.redoAction(player)
+				} else if (response.selection == 2) {
+					worldeditorMenu(player)
+				}
+			})
+		} else if (response.selection == 2){
+			let form = new ActionFormData();
+			form.title("§d§lWorld Editor Commands")
+			form.button(`§a§l> §0§lMask`)
+			form.button(`§c§l> §0§lBack`)
+			form.show(player).then(response => {
+				if (response.selection == 0) {
+					maskLib.sendMaskMenu(player)
+				}  else if (response.selection == 1) {
+					worldeditorMenu(player)
+				}
+			})
+		} else if (response.selection == 3){
+			
 		} else if (response.selection == 4){
 			
 		} else if (response.selection == 5){
