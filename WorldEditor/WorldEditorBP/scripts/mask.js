@@ -1,5 +1,5 @@
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
-import * as editor from './events'
+import * as editor from './main'
 
 export let mask = new Map();
 

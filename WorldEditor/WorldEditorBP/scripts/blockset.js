@@ -1,7 +1,8 @@
 import { system, BlockVolume } from '@minecraft/server';
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as maskLib from './mask'
-import * as editor from './events'
+import * as editor from './main'
+import * as undoManager from './undo'
 
 const blockFillLimit = 32768
 let pickBlock = new Map();
@@ -106,6 +107,7 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none", repl
 
     // Get Sections
     let sections = createSections(pos1, pos2);
+    await undoManager.saveAction(player, sections)
 
     // Calculate total number of blocks
     const totalBlocks = getBlockTotal(pos1, pos2);
@@ -130,7 +132,6 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none", repl
 
             for (let t = 0; t < sections.length; t++) {
                 let blockVolume = sections[t];
-
                 loaded += blockVolume.getCapacity();
                 chunkLoad += blockVolume.getCapacity();
 
@@ -202,11 +203,11 @@ export function getBlockTotal(pos1, pos2){
     return totalBlocks;
 }
 
-export function createSections(pos1, pos2){
+export function createSections(pos1, pos2, blockFillLimit = 32768){
 
     // Determine Coordinates
-    const p1 = pos1
-    const p2 = pos2
+    const p1 = pos1;
+    const p2 = pos2;
     const highX = Math.max(p2.x, p1.x);
     const highY = Math.max(p2.y, p1.y);
     const highZ = Math.max(p2.z, p1.z);
@@ -229,16 +230,16 @@ export function createSections(pos1, pos2){
                 let currentZ = z;
 
                 while (currentX <= highX) {
-                    let maxSectionX = Math.min(sizeX, Math.floor(blockFillLimit / (sizeY * sizeZ)));
+                    let maxSectionX = Math.min(64, sizeX, Math.floor(blockFillLimit / (sizeY * sizeZ)));
                     let endX = Math.min(currentX + maxSectionX - 1, highX);
 
-                    while (currentY <= highY) {
-                        let maxSectionY = Math.min(sizeY, Math.floor(blockFillLimit / (maxSectionX * sizeZ)));
-                        let endY = Math.min(currentY + maxSectionY - 1, highY);
+                    while (currentZ <= highZ) {
+                        let maxSectionZ = Math.min(64, sizeZ, Math.floor(blockFillLimit / (maxSectionX * sizeY)));
+                        let endZ = Math.min(currentZ + maxSectionZ - 1, highZ);
 
-                        while (currentZ <= highZ) {
-                            let maxSectionZ = Math.min(sizeZ, Math.floor(blockFillLimit / (maxSectionX * maxSectionY)));
-                            let endZ = Math.min(currentZ + maxSectionZ - 1, highZ);
+                        while (currentY <= highY) {
+                            let maxSectionY = Math.min(sizeY, Math.floor(blockFillLimit / (maxSectionX * maxSectionZ)));
+                            let endY = Math.min(currentY + maxSectionY - 1, highY);
 
                             const blockVolume = new BlockVolume(
                                 { x: currentX, y: currentY, z: currentZ },
@@ -246,15 +247,15 @@ export function createSections(pos1, pos2){
                             );
                             sections.push(blockVolume);
 
-                            currentZ = endZ + 1;
+                            currentY = endY + 1;
                         }
 
-                        currentY = endY + 1;
-                        currentZ = z; // Reset Z for next Y section
+                        currentZ = endZ + 1;
+                        currentY = y; // Reset Y for next Z section
                     }
 
                     currentX = endX + 1;
-                    currentY = y; // Reset Y for next X section
+                    currentZ = z; // Reset Z for next X section
                 }
             }
         }
