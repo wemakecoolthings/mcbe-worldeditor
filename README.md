@@ -18,7 +18,6 @@ Current Features
   - Disabled via the menu opened by the World Editor
 
 Features To-Do List:
-- Support for block permutations
 - Support for dynamic brush tools
 - Support for different brush types / patterns
 - Support to set multiple blocks without the brush tool
