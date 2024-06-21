@@ -1,4 +1,4 @@
-import { world } from '@minecraft/server';
+import { BlockVolume, world } from '@minecraft/server';
 
 let undoSave = new Map(); // Map to store undo actions
 let redoSave = new Map(); // Map to store redo actions
@@ -29,7 +29,7 @@ export function saveAction(player, blockSelections) {
     undoSave.get(player.id).push(actionId);
 }
 
-function saveStructures(player, blockSelections, actionId) {
+export function saveStructures(player, blockSelections, actionId) {
     for (let i = 0; i < blockSelections.length; i++) {
         let section = blockSelections[i];
         let structureId = `worldeditor:${player.name.replace(' ', '_')}_save${actionId}_${i}`;
