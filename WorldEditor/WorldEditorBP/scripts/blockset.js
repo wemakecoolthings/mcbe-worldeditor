@@ -3,21 +3,32 @@ import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as maskLib from './mask'
 import * as editor from './main'
 import * as undoManager from './actionSave'
+import * as shapes from './shapes'
 
-let pickBlock = new Map();
+export let pickBlock = new Map();
 let permutationRecord = new Map();
+let directedFunction = new Map();
+
+export function setFunction(player, func){
+    directedFunction.set(player.id, func)
+}
+
+export function setPermRecord(player, record){
+    permutationRecord.set(player.id, record)
+}
 
 export function resetPermRecord(player){
     permutationRecord.set(player.id, "record_replace")
 }
 
-export function setBlockMenu(player, pos1, pos2, exe){
+export function setBlockMenu(player, pos1, pos2){
     let form = new ActionFormData();
     form.title("Block Set Function")
     form.body(`Please pick a method to set your block!`)
     form.button(`§a§l> §r§lType a Block ID!`)
     form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
     form.show(player).then(response => {
+        let exe = player.dimension;
         if(response.selection == 0){
             let form = new ModalFormData();
             form.title("Block Set Function")
@@ -36,13 +47,14 @@ export function setBlockMenu(player, pos1, pos2, exe){
     })
 }
 
-export function setBlockReplaceMenu(player, pos1, pos2, exe){
+export function setBlockReplaceMenu(player, pos1, pos2){
     let form = new ActionFormData();
     form.title("Block Set Function")
     form.body(`Please pick a method to set your block!`)
     form.button(`§a§l> §r§lType a Block ID!`)
     form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
     form.show(player).then(response => {
+        let exe = player.dimension;
         if(response.selection == 0){
             let form = new ModalFormData();
             form.title("Block Set Function")
@@ -73,7 +85,14 @@ export function setPickBlock(player, block){
         if(permutationRecord.has(player.id)){
             if(permutationRecord.get(player.id) == "record"){
                 pickBlock.set(player.id, block)
-                setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), editor.exe);
+
+                if(!directedFunction.has(player.id)){
+                    setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension);
+                } else if(directedFunction.get(player.id) == "shape") { // Redirect Function
+                    shapes.filterShapeCreate(player, block);
+                }
+
+                directedFunction.delete(player.id)
                 permutationRecord.delete(player.id)
                 editor.setPickBlock(0)
             } else if(permutationRecord.get(player.id) == "record_replace"){
@@ -86,7 +105,7 @@ export function setPickBlock(player, block){
                 if(typeof block2 == "string"){
                     replace = "replace_block"
                 } 
-                setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), editor.exe, replace, block2); 
+                setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension, replace, block2); 
                 permutationRecord.delete(player.id)
                 editor.setPickBlock(0)
             }
@@ -109,25 +128,17 @@ function setBlock(player, block, pos1, pos2, exe, isReplace = "none", replaceBlo
     const totalBlocks = getBlockTotal(pos1, pos2);
 
     // Option Check for out of bounds blocks on small loops
-    let chunkCheck = false;
-    if(totalBlocks < 4097){
-        try{
-            for(let i = 0; i < sections.length; i++){
-                if(exe.getBlocks(sections[i], {}, false) == undefined){
-                    chunkCheck = true;
-                }
-            }
-        } catch(e){
-            chunkCheck = true;
+    try{
+        for(let i = 0; i < sections.length; i++){
+            exe.getBlocks(sections[i], {}, false) == undefined
         }
+    } catch(e){
+        player.sendMessage(`§cWarning, this selection contains unloaded chunks and sections may not set correctly!`);
     }
 
     // Overall limit
     if(totalBlocks >= 5000000){
         player.sendMessage(`§cYou cannot set more than the limit of 5,000,000 blocks.`);
-        return;
-    } else if(chunkCheck == true){
-        player.sendMessage(`§cThis selection contains unloaded chunks and cannot be loaded automatically.`);
         return;
     }
 

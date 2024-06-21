@@ -4,11 +4,11 @@ import * as blockset from './blockset'
 import * as maskLib from './mask'
 import * as actionManager from './actionSave'
 import * as struct from './structures'
+import * as shapes from './shapes'
 
 // Save Positions
 export let pos1 = new Map();
 export let pos2 = new Map();
-export let exe = world.getDimension("overworld")
 export let pickBlock = 0;
 
 // Manage Active Events
@@ -18,7 +18,9 @@ export let events = new Map();
 let toggle = 0;
 
 // Reset Players
-exe.runCommand(`inputpermission set @a movement enabled`)
+world.getDimension("overworld").runCommand(`inputpermission set @a movement enabled`)
+world.getDimension("nether").runCommand(`inputpermission set @a movement enabled`)
+world.getDimension("the_end").runCommand(`inputpermission set @a movement enabled`)
 
 // Main Menu
 function worldeditorMenu(player) {
@@ -27,9 +29,9 @@ function worldeditorMenu(player) {
 	form.button(`§a§l> §0§lBlock Set Commands`)
 	form.button(`§a§l> §0§lStructure Commands`)
 	form.button(`§a§l> §0§lSelection Commands`)
+	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lBrush Commands`)
 	form.button(`§a§l> §0§lTerrain Commands`)
-	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lNavigation Commands`)
 	form.button(`§a§l> §0§lInfo Commands`)
 	form.button(`§a§l> §0§lDisable World Editor`)
@@ -51,9 +53,9 @@ function worldeditorMenu(player) {
 				}
 
 				if (response.selection == 0) {
-					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
+					blockset.setBlockMenu(player, pos1.get(player.id), pos2.get(player.id), player.dimension);
 				} else if (response.selection == 1) {
-					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), exe);
+					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), player.dimension);
 				} else if (response.selection == 2) {
 					worldeditorMenu(player)
 				}
@@ -61,12 +63,6 @@ function worldeditorMenu(player) {
 			})
 
 		} else if (response.selection == 1){
-			if (!response.canceled) {
-				if (!pos1.has(player.id) || !pos2.has(player.id)) {
-					player.sendMessage(`§aYou must select two valid positions before using these commands.`)
-					return;
-				}
-			}
 			sendStructuresMenu(player)
 		} else if (response.selection == 2){
 			let form = new ActionFormData();
@@ -81,7 +77,7 @@ function worldeditorMenu(player) {
 				}
 			})
 		} else if (response.selection == 3){
-			
+			shapes.sendShapesMenu(player)
 		} else if (response.selection == 4){
 			
 		} else if (response.selection == 5){
@@ -112,6 +108,14 @@ export function sendStructuresMenu(player){
 	form.button(`§a§l> §0§lChange Save Settings`)
 	form.button(`§c§l> §0§lBack`)
 	form.show(player).then(response => {
+
+		if (!response.canceled && response.selection > 1) {
+			if (!pos1.has(player.id) || !pos2.has(player.id)) {
+				player.sendMessage(`§aYou must select two valid positions before using these commands.`)
+				return;
+			}
+		}
+
 		if(response.selection == 0){
 			actionManager.revertAction(player);
 		} else if (response.selection == 1){
@@ -152,7 +156,6 @@ export function setPickBlock(num){
 // Axe & Main Command Menu
 world.afterEvents.itemUse.subscribe(ev => {
 	if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 1 && pickBlock != 0) {
-		
 		if(ev.source.isSneaking){
 			blockset.resetPermRecord(ev.source)
 			ev.source.sendMessage(`§cSelection undone.`)
@@ -180,8 +183,8 @@ world.afterEvents.itemUse.subscribe(ev => {
 	} else if (ev.source.hasTag("worldeditor") && ev.itemStack?.typeId.includes("we:world_editor") && toggle == 0) {
 		toggle = 1;
 		toggleEvents()
-		exe.runCommand(`clear "${ev.source.name}" wooden_axe`)
-		exe.runCommand(`give "${ev.source.name}" wooden_axe`)
+		ev.source.dimension.runCommand(`clear "${ev.source.name}" wooden_axe`)
+		ev.source.dimension.runCommand(`give "${ev.source.name}" wooden_axe`)
 		ev.source.sendMessage(`§aWorld Editor Enabled`)
 	}
 })

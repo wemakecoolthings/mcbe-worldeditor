@@ -187,6 +187,8 @@ export function copyArea(player, blockSelections) {
 }
 
 export function cutArea(player, blockSelections) {
+    let exe = world.getDimension(player.dimension)
+
     // Delete previous copy
     let copyID = `worldeditor:${player.name.replace(' ', '_')}_copied`;
     let structures = world.structureManager.getWorldStructureIds();
@@ -236,7 +238,7 @@ export function cutArea(player, blockSelections) {
     actions.saveAction(player, blockSelections);
     for (let i = 0; i < blockSelections.length; i++) {
         let section = blockSelections[i];
-        main.exe.fillBlocks(section, "minecraft:air", {ignoreChunkBoundErrors: true});
+        exe.fillBlocks(section, "minecraft:air", {ignoreChunkBoundErrors: true});
     }
 
     userCopyStatus.add(player.id);
