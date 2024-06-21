@@ -13,6 +13,11 @@ Current Features
 - Mask
 - Undo
 - Redo
+- Copy
+- Paste
+- Cut
+- Rotate
+- Flip
 - Pack is disabled by default for performance
   - Enabled by clicking the World Editor
   - Disabled via the menu opened by the World Editor
@@ -35,11 +40,6 @@ Features To-Do List:
 - Drain
 - Snow
 - Thaw
-- Copy
-- Paste
-- Cut
-- Rotate
-- Flip
 - Schem Save
 - Scham Load
 - Scham List
