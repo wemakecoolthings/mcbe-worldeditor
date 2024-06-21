@@ -4,7 +4,6 @@ import * as maskLib from './mask'
 import * as editor from './main'
 import * as undoManager from './actionSave'
 
-const blockFillLimit = 32768
 let pickBlock = new Map();
 let permutationRecord = new Map();
 
@@ -97,20 +96,43 @@ export function setPickBlock(player, block){
     })
 }
 
-async function setBlock(player, block, pos1, pos2, exe, isReplace = "none", replaceBlock = ""){
+function setBlock(player, block, pos1, pos2, exe, isReplace = "none", replaceBlock = ""){
 
     // Save Initial Position
     const startPos = player.location;
 
-    // Halt Movement
-    exe.runCommand(`inputpermission set "${player.name}" movement disabled`)
-
     // Get Sections
     let sections = createSections(pos1, pos2);
-    await undoManager.saveAction(player, sections)
+    undoManager.saveAction(player, sections)
 
     // Calculate total number of blocks
     const totalBlocks = getBlockTotal(pos1, pos2);
+
+    // Option Check for out of bounds blocks on small loops
+    let chunkCheck = false;
+    if(totalBlocks < 4097){
+        try{
+            for(let i = 0; i < sections.length; i++){
+                if(exe.getBlocks(sections[i], {}, false) == undefined){
+                    chunkCheck = true;
+                }
+            }
+        } catch(e){
+            chunkCheck = true;
+        }
+    }
+
+    // Overall limit
+    if(totalBlocks >= 5000000){
+        player.sendMessage(`§cYou cannot set more than the limit of 5,000,000 blocks.`);
+        return;
+    } else if(chunkCheck == true){
+        player.sendMessage(`§cThis selection contains unloaded chunks and cannot be loaded automatically.`);
+        return;
+    }
+
+    // Halt Movement
+    exe.runCommand(`inputpermission set "${player.name}" movement disabled`)
 
     let loaded = 0;
     let chunkLoad = 0;
@@ -145,7 +167,7 @@ async function setBlock(player, block, pos1, pos2, exe, isReplace = "none", repl
                 if(chunkLoad > chunkLimit){
                     chunkLoad = 0;
                     player.teleport(blockVolume.getMax());
-                }
+                } 
 
                 // Fill Blocks
                 if(isReplace == "replace_perm"){
