@@ -1,8 +1,9 @@
-import { world, system, Block, BlockType } from '@minecraft/server';
+import { world, system, Block, BlockType, StructureSaveMode } from '@minecraft/server';
 import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
 import * as blockset from './blockset'
 import * as maskLib from './mask'
 import * as actionManager from './actionSave'
+import * as struct from './structures'
 
 // Save Positions
 export let pos1 = new Map();
@@ -44,7 +45,7 @@ function worldeditorMenu(player) {
 
 				if (!response.canceled && response.selection != 2) {
 					if (!pos1.has(player.id) || !pos2.has(player.id)) {
-						player.sendMessage(`§aYou must select two valid positions before using commands.`)
+						player.sendMessage(`§aYou must select two valid positions before using these commands.`)
 						return;
 					}
 				}
@@ -60,20 +61,13 @@ function worldeditorMenu(player) {
 			})
 
 		} else if (response.selection == 1){
-			let form = new ActionFormData();
-			form.title("§d§lWorld Editor Commands")
-			form.button(`§a§l> §0§lUndo`)
-			form.button(`§a§l> §0§lRedo`)
-			form.button(`§c§l> §0§lBack`)
-			form.show(player).then(response => {
-				if(response.selection == 0){
-					actionManager.revertAction(player);
-				} else if (response.selection == 1){
-					actionManager.redoAction(player)
-				} else if (response.selection == 2) {
-					worldeditorMenu(player)
+			if (!response.canceled) {
+				if (!pos1.has(player.id) || !pos2.has(player.id)) {
+					player.sendMessage(`§aYou must select two valid positions before using these commands.`)
+					return;
 				}
-			})
+			}
+			sendStructuresMenu(player)
 		} else if (response.selection == 2){
 			let form = new ActionFormData();
 			form.title("§d§lWorld Editor Commands")
@@ -96,13 +90,57 @@ function worldeditorMenu(player) {
 			
 		} else if (response.selection == 7){
 			
-		} else if (response.selection == 8){
-			
-		} else if(response.selection == 9){
+		} else if(response.selection == 8){
 			toggle = 0;
 			player.sendMessage(`§cWorld Editor Disabled`)
 			world.beforeEvents.playerBreakBlock.unsubscribe(events.get(1))
 			world.beforeEvents.playerInteractWithBlock.unsubscribe(events.get(2))
+		}
+	})
+}
+
+export function sendStructuresMenu(player){
+	let form = new ActionFormData();
+	form.title("§d§lWorld Editor Commands")
+	form.button(`§a§l> §0§lUndo`)
+	form.button(`§a§l> §0§lRedo`)
+	form.button(`§a§l> §0§lCopy`)
+	form.button(`§a§l> §0§lPaste`)
+	form.button(`§a§l> §0§lCut`)
+	form.button(`§a§l> §0§lRotate`)
+	form.button(`§a§l> §0§lFlip`)
+	form.button(`§a§l> §0§lChange Save Settings`)
+	form.button(`§c§l> §0§lBack`)
+	form.show(player).then(response => {
+		if(response.selection == 0){
+			actionManager.revertAction(player);
+		} else if (response.selection == 1){
+			actionManager.redoAction(player)
+		} else if (response.selection == 2){
+			let sections = blockset.createSections(pos1.get(player.id), pos2.get(player.id));
+			struct.copyArea(player, sections);
+		} else if (response.selection == 3){
+			let blockTotal = blockset.getBlockTotal(pos1.get(player.id), pos2.get(player.id));
+			struct.pasteArea(player, blockTotal)
+		} else if (response.selection == 4){
+			let sections = blockset.createSections(pos1.get(player.id), pos2.get(player.id));
+			struct.cutArea(player, sections)
+		} else if (response.selection == 5){
+			struct.sendRotateMenu(player)
+		} else if (response.selection == 6){
+			struct.sendFlipMenu(player)
+		} else if (response.selection == 7) {
+			let form = new ModalFormData();
+			form.title(`§d§lChange Save Settings`)
+			form.toggle(`Include Blocks`, struct.includeBlocks)
+			form.toggle(`Include Entities`, struct.includeEntities)
+			form.show(player).then(response => {
+				if(!response.canceled){
+					struct.changeConfig(response.formValues[0], response.formValues[1])
+				}
+			})
+		} else if (response.selection == 8) {
+			worldeditorMenu(player)
 		}
 	})
 }
@@ -159,7 +197,6 @@ function toggleEvents() {
 	const eventBreak = world.beforeEvents.playerBreakBlock.subscribe(ev => {
 		let checkRecord = ev.player.hasTag("record") || ev.player.hasTag("record_replace") || ev.player.hasTag("record_final")
 		if (ev.player.hasTag("worldeditor") && ev.itemStack?.typeId.includes("wooden_axe") && checkRecord == false) {
-
 			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos1.set(ev.player.id, loc);
 			if (pos2.has(ev.player.id)) {
