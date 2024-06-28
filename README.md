@@ -19,16 +19,16 @@ Current Features
 - Rotate
 - Flip
 - Shapes Tool (the following are supported)
- - Spheres
- - Circles
- - Cylinders
- - Triangles
- - Pyramids
- - Squares
- - Cubes
- - Helix
- - Double Helix
- - Spiral
+  - Spheres
+  - Circles
+  - Cylinders
+  - Triangles
+  - Pyramids
+  - Squares
+  - Cubes
+  - Helix
+  - Double Helix
+  - Spiral
 - Pack is disabled by default for performance
   - Enabled by clicking the World Editor
   - Disabled via the menu opened by the World Editor
