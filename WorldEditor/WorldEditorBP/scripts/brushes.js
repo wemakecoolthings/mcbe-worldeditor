@@ -7,6 +7,8 @@ let brushOpt1 = new Map();
 let brushOpt2 = new Map();
 let brushMode = new Set();
 
+
+
 // In-Progress
 /*
 export function brush(player) {
