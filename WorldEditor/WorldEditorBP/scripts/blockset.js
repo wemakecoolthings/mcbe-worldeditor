@@ -8,6 +8,7 @@ import * as shapes from './shapes'
 export let pickBlock = new Map();
 let permutationRecord = new Map();
 let directedFunction = new Map();
+let replaceNearSave = new Map();
 
 export function setFunction(player, func){
     directedFunction.set(player.id, func)
@@ -23,7 +24,7 @@ export function resetPermRecord(player){
 
 export function setBlockMenu(player, pos1, pos2){
     let form = new ActionFormData();
-    form.title("Block Set Function")
+    form.title("§d§lBlock Set Function")
     form.body(`Please pick a method to set your block!`)
     form.button(`§a§l> §r§lType a Block ID!`)
     form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
@@ -47,9 +48,280 @@ export function setBlockMenu(player, pos1, pos2){
     })
 }
 
+export function sendReplaceNearMenu(player){
+    let form = new ActionFormData();
+    form.title("§d§lBlock Set Function")
+    form.button(`§a§l> §r§lReplacenear All`)
+    form.button(`§a§l> §r§lReplacenear Specified`)
+    form.show(player).then(response => {
+        if(response.selection == 0){
+            let form = new ActionFormData();
+            form.title("§d§lBlock Set Function")
+            form.body(`Please pick a method to set your block!`)
+            form.button(`§a§l> §r§lType a Block ID!`)
+            form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
+            form.show(player).then(response => {
+                if(response.selection == 0){
+                    let form = new ModalFormData();
+                    form.title("Block Set Function")
+                    form.textField("Block ID: ", "")
+                    form.slider(`Radius`, 1, 50, 1, 5)
+                    form.show(player).then(response => {
+                        if(!response.canceled){
+                            let block = response.formValues[0];
+                            let radius = response.formValues[1];
+                            replaceNear(player, player.location, block, radius);
+                        }
+                    })
+                } else if(response.selection == 1){
+                    let form = new ModalFormData();
+                    form.title("Block Set Function")
+                    form.slider(`Radius`, 1, 50, 1, 5)
+                    form.show(player).then(response => {
+                        if(!response.canceled){
+                            let radius = response.formValues[0];
+                            permutationRecord.set(player.id, "record")
+                            directedFunction.set(player.id, "replacenear")
+                            let newLoc = player.location;
+                            const blockVolume = new BlockVolume(newLoc, newLoc);
+                            player.dimension.fillBlocks(blockVolume, "glowstone", { ignoreChunkBoundErrors: true });
+                            replaceNearSave.set(player.id, {newLoc, radius})
+                            player.sendMessage(`§aUse worldeditor to grab block!`);
+                            editor.setPickBlock(1)
+                        }
+                    })
+                }
+            })
+        } else if(response.selection == 1){
+            let form = new ActionFormData();
+            form.title("§d§lBlock Set Function")
+            form.body(`Please pick a method to set your block!`)
+            form.button(`§a§l> §r§lType a Block ID!`)
+            form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
+            form.show(player).then(response => {
+                if(response.selection == 0){
+                    let form = new ModalFormData();
+                    form.title("Block Set Function")
+                    form.textField("Block To Replace ID: ", "")
+                    form.textField("Block To Set ID: ", "")
+                    form.slider(`Radius`, 1, 50, 1, 5)
+                    form.show(player).then(response => {
+                        if(!response.canceled){
+                            let block = response.formValues[0];
+                            let newBlock = response.formValues[1];
+                            let radius = response.formValues[2];
+                            replaceNearSpecified(player, player.location, newBlock, block, radius);
+                        }
+                    })
+                } else if(response.selection == 1){
+                    let form = new ModalFormData();
+                    form.title("Block Set Function")
+                    form.slider(`Radius`, 1, 50, 1, 5)
+                    form.show(player).then(response => {
+                        if(!response.canceled){
+                            let radius = response.formValues[0];
+                            permutationRecord.set(player.id, "record_replace")
+                            directedFunction.set(player.id, "replacenear")
+                            let newLoc = player.location;
+                            const blockVolume = new BlockVolume(newLoc, newLoc);
+                            player.dimension.fillBlocks(blockVolume, "glowstone", { ignoreChunkBoundErrors: true });
+                            replaceNearSave.set(player.id, {newLoc, radius})
+                            player.sendMessage(`§aUse worldeditor to grab block!`);
+                            editor.setPickBlock(1)
+                        }
+                    })
+                }
+            })
+        }
+    })
+}
+
+function replaceNearSpecified(player, location, block, replaceBlock, radius) {
+    const dimension = player.dimension;
+    const { x: cx, y: cy, z: cz } = location;
+
+    // Calculate the bounding box for the replacement
+    const minX = cx - radius;
+    const maxX = cx + radius;
+    const minY = cy - radius;
+    const maxY = cy + radius;
+    const minZ = cz - radius;
+    const maxZ = cz + radius;
+
+    // Create sections for the area to be replaced
+    const pos1 = { x: minX, y: minY, z: minZ };
+    const pos2 = { x: maxX, y: maxY, z: maxZ };
+    const sections = createSections(pos1, pos2);
+
+    // Save sections for undo functionality if needed
+    undoManager.saveAction(player, sections);
+
+    // Calculate total number of blocks
+    const totalBlocks = getBlockTotal(pos1, pos2);
+
+    // Check if the total number of blocks exceeds the limit
+    if (totalBlocks >= 5000000) {
+        player.sendMessage(`§cYou cannot set more than the limit of 5,000,000 blocks.`);
+        return;
+    }
+
+    let loaded = 0;
+    let replaceCounter = 0;
+    const batchSize = 100; // Number of sections to process per tick
+
+    // Function to process sections in batches
+    function processSections(batchIndex) {
+        if (batchIndex >= sections.length) {
+            player.sendMessage(`§dFinished replacing blocks within a radius of ${radius} §7§o[${replaceCounter} replaced]`);
+            return;
+        }
+
+        const endIndex = Math.min(batchIndex + batchSize, sections.length);
+
+        for (let t = batchIndex; t < endIndex; t++) {
+            let blockVolume = sections[t];
+            loaded += blockVolume.getCapacity();
+
+            player.onScreenDisplay.setActionBar(`§dLoading block sections... §7§o[${loaded}/${totalBlocks}] §l[${replaceCounter} Replaced]`);
+
+            // Determine if replaceBlock is a permutation or block type
+            if (typeof replaceBlock == "string") {
+                replaceCounter += dimension.getBlocks(blockVolume, { includeTypes: [replaceBlock] }, true).getCapacity();
+                dimension.fillBlocks(blockVolume, block, { ignoreChunkBoundErrors: true, blockFilter: { includeTypes: [replaceBlock] } });
+            } else {
+                replaceCounter += dimension.getBlocks(blockVolume, { includePermutations: [replaceBlock] }, true).getCapacity();
+                dimension.fillBlocks(blockVolume, block, { ignoreChunkBoundErrors: true, blockFilter: { includePermutations: [replaceBlock] } });
+            }
+        }
+
+        // Schedule the next batch
+        system.runTimeout(() => processSections(endIndex), 1);
+    }
+
+    // Start processing sections in batches
+    processSections(0);
+}
+
+function replaceNear(player, location, block, radius) {
+    const dimension = player.dimension;
+    const { x: cx, y: cy, z: cz } = location;
+
+    // Calculate the bounding box for the replacement
+    const minX = cx - radius;
+    const maxX = cx + radius;
+    const minY = cy - radius;
+    const maxY = cy + radius;
+    const minZ = cz - radius;
+    const maxZ = cz + radius;
+
+    // Create sections for the area to be replaced
+    const pos1 = { x: minX, y: minY, z: minZ };
+    const pos2 = { x: maxX, y: maxY, z: maxZ };
+    const sections = createSections(pos1, pos2);
+
+    // Save sections for undo functionality if needed
+    undoManager.saveAction(player, sections);
+
+    // Calculate total number of blocks
+    const totalBlocks = getBlockTotal(pos1, pos2);
+
+    // Check if the total number of blocks exceeds the limit
+    if (totalBlocks >= 5000000) {
+        player.sendMessage(`§cYou cannot set more than the limit of 5,000,000 blocks.`);
+        return;
+    }
+
+    let loaded = 0;
+    let replaceCounter = 0;
+    const batchSize = 100; // Number of sections to process per tick
+
+    // Function to process sections in batches
+    function processSections(batchIndex) {
+        if (batchIndex >= sections.length) {
+            player.sendMessage(`§dFinished replacing blocks within a radius of ${radius} §7§o[${replaceCounter} replaced]`);
+            return;
+        }
+
+        const endIndex = Math.min(batchIndex + batchSize, sections.length);
+
+        for (let t = batchIndex; t < endIndex; t++) {
+            let blockVolume = sections[t];
+            loaded += blockVolume.getCapacity();
+
+            player.onScreenDisplay.setActionBar(`§dLoading block sections... §7§o[${loaded}/${totalBlocks}] §l[${replaceCounter} Replaced]`);
+
+            // Replace blocks except air
+            replaceCounter += dimension.getBlocks(blockVolume, { excludeTypes: ["minecraft:air"] }, true).getCapacity();
+            dimension.fillBlocks(blockVolume, block, { ignoreChunkBoundErrors: true, blockFilter: { excludeTypes: ["minecraft:air"] } });
+        }
+
+        // Schedule the next batch
+        system.runTimeout(() => processSections(endIndex), 1);
+    }
+
+    // Start processing sections in batches
+    processSections(0);
+}
+
+export function setPickBlock(player, block){
+    if(typeof block == "string"){
+        player.sendMessage(`§d${block} found!`);
+    } else {
+        player.sendMessage(`§d${block.type.id} found!`);
+    }
+    system.run(() => {
+        if(permutationRecord.has(player.id)){
+            if(permutationRecord.get(player.id) == "record"){
+                pickBlock.set(player.id, block)
+
+                if(!directedFunction.has(player.id)){
+                    setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension);
+                } else if(directedFunction.get(player.id) == "shape") { // Redirect Function
+                    shapes.filterShapeCreate(player, block);
+                } else if(directedFunction.get(player.id) == "replacenear") { // Redirect Function
+                    let { newLoc, radius } = replaceNearSave.get(player.id)
+                    replaceNear(player, newLoc, block, radius)
+                    const blockVolume = new BlockVolume(newLoc, newLoc);
+                    player.dimension.fillBlocks(blockVolume, "air", { ignoreChunkBoundErrors: true });
+                    directedFunction.delete(player.id)
+                }
+
+                directedFunction.delete(player.id)
+                permutationRecord.delete(player.id)
+                editor.setPickBlock(0)
+            } else if(permutationRecord.get(player.id) == "record_replace"){
+                pickBlock.set(player.id, block)    
+                permutationRecord.set(player.id, "record_final");
+                player.sendMessage(`§aUse worldeditor to grab another block\n§7Sneak worldeditor to undo selection!`);
+            } else if(permutationRecord.get(player.id) == "record_final"){
+                let block2 = pickBlock.get(player.id)  
+                let replace = "replace_perm";
+                if(typeof block2 == "string"){
+                    replace = "replace_block"
+                } 
+
+                if(!directedFunction.has(player.id)){
+                    setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension, replace, block2); 
+                } else if(directedFunction.get(player.id) == "replacenear") { // Redirect Function
+                    let { newLoc, radius } = replaceNearSave.get(player.id)
+                    replaceNearSpecified(player, newLoc, block, block2, radius)
+                    const blockVolume = new BlockVolume(newLoc, newLoc);
+                    player.dimension.fillBlocks(blockVolume, "air", { ignoreChunkBoundErrors: true });
+                    directedFunction.delete(player.id)
+                }
+
+                permutationRecord.delete(player.id)
+                editor.setPickBlock(0)
+            }
+        } else {
+            player.sendMessage(`§cPick block record seems to have stopped working.`);
+        }
+    })
+}
+
 export function setBlockReplaceMenu(player, pos1, pos2){
     let form = new ActionFormData();
-    form.title("Block Set Function")
+    form.title("§d§lBlock Set Function")
     form.body(`Please pick a method to set your block!`)
     form.button(`§a§l> §r§lType a Block ID!`)
     form.button(`§a§l> §r§lUse "Pick Block" Tool!`)
@@ -71,46 +343,6 @@ export function setBlockReplaceMenu(player, pos1, pos2){
             player.sendMessage(`§dUse worldeditor to grab block!`);
             permutationRecord.set(player.id, "record_replace")
             editor.setPickBlock(1)
-        }
-    })
-}
-
-export function setPickBlock(player, block){
-    if(typeof block == "string"){
-        player.sendMessage(`§d${block} found!`);
-    } else {
-        player.sendMessage(`§d${block.type.id} found!`);
-    }
-    system.run(() => {
-        if(permutationRecord.has(player.id)){
-            if(permutationRecord.get(player.id) == "record"){
-                pickBlock.set(player.id, block)
-
-                if(!directedFunction.has(player.id)){
-                    setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension);
-                } else if(directedFunction.get(player.id) == "shape") { // Redirect Function
-                    shapes.filterShapeCreate(player, block);
-                }
-
-                directedFunction.delete(player.id)
-                permutationRecord.delete(player.id)
-                editor.setPickBlock(0)
-            } else if(permutationRecord.get(player.id) == "record_replace"){
-                pickBlock.set(player.id, block)    
-                permutationRecord.set(player.id, "record_final");
-                player.sendMessage(`§aUse worldeditor to grab another block\n§7Sneak worldeditor to undo selection!`);
-            } else if(permutationRecord.get(player.id) == "record_final"){
-                let block2 = pickBlock.get(player.id)  
-                let replace = "replace_perm";
-                if(typeof block2 == "string"){
-                    replace = "replace_block"
-                } 
-                setBlock(player, block, editor.pos1.get(player.id), editor.pos2.get(player.id), player.dimension, replace, block2); 
-                permutationRecord.delete(player.id)
-                editor.setPickBlock(0)
-            }
-        } else {
-            player.sendMessage(`§cPick block record seems to have stopped working.`);
         }
     })
 }

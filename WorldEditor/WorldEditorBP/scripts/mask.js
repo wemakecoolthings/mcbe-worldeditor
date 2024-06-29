@@ -10,7 +10,7 @@ export function setMask(player, maskedBlock){
 
 export function sendMaskMenu(player){
     let form = new ActionFormData();
-	form.title("§aBlock Mask Function")
+	form.title("§d§lBlock Mask Function")
 	form.button(`§a§l> §0§lSet Mask`)
 	form.button(`§a§l> §0§lRemove Mask`)
 	form.show(player).then(response => {

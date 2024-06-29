@@ -5,6 +5,7 @@ import * as maskLib from './mask'
 import * as actionManager from './actionSave'
 import * as struct from './structures'
 import * as shapes from './shapes'
+import * as brush from './brushes'
 
 // Save Positions
 export let pos1 = new Map();
@@ -23,12 +24,11 @@ world.getDimension("nether").runCommand(`inputpermission set @a movement enabled
 world.getDimension("the_end").runCommand(`inputpermission set @a movement enabled`)
 
 // Main Menu
-function worldeditorMenu(player) {
+export function worldeditorMenu(player) {
 	let form = new ActionFormData();
 	form.title("§d§lWorld Editor Commands")
 	form.button(`§a§l> §0§lBlock Set Commands`)
 	form.button(`§a§l> §0§lStructure Commands`)
-	form.button(`§a§l> §0§lSelection Commands`)
 	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lBrush Commands`)
 	form.button(`§a§l> §0§lTerrain Commands`)
@@ -42,12 +42,14 @@ function worldeditorMenu(player) {
 			form.title("§d§lWorld Editor Commands")
 			form.button(`§a§l> §0§lSet Block`)
 			form.button(`§a§l> §0§lReplace Block`)
+			form.button(`§a§l> §0§lReplacenear`)
+			form.button(`§a§l> §0§lMask`)
 			form.button(`§c§l> §0§lBack`)
 			form.show(player).then(response => {
 
-				if (!response.canceled && response.selection != 2) {
+				if (!response.canceled && response.selection < 2) {
 					if (!pos1.has(player.id) || !pos2.has(player.id)) {
-						player.sendMessage(`§aYou must select two valid positions before using these commands.`)
+						player.sendMessage(`§aYou must select two valid positions before using this command`)
 						return;
 					}
 				}
@@ -57,6 +59,10 @@ function worldeditorMenu(player) {
 				} else if (response.selection == 1) {
 					blockset.setBlockReplaceMenu(player, pos1.get(player.id), pos2.get(player.id), player.dimension);
 				} else if (response.selection == 2) {
+					blockset.sendReplaceNearMenu(player);
+				} else if(response.selection == 3){
+					maskLib.sendMaskMenu(player)
+				} else if(response.selection == 4){
 					worldeditorMenu(player)
 				}
 
@@ -65,28 +71,16 @@ function worldeditorMenu(player) {
 		} else if (response.selection == 1){
 			sendStructuresMenu(player)
 		} else if (response.selection == 2){
-			let form = new ActionFormData();
-			form.title("§d§lWorld Editor Commands")
-			form.button(`§a§l> §0§lMask`)
-			form.button(`§c§l> §0§lBack`)
-			form.show(player).then(response => {
-				if (response.selection == 0) {
-					maskLib.sendMaskMenu(player)
-				}  else if (response.selection == 1) {
-					worldeditorMenu(player)
-				}
-			})
-		} else if (response.selection == 3){
 			shapes.sendShapesMenu(player)
+		} else if (response.selection == 3){
+			brush.sendBrushMenu(player)
 		} else if (response.selection == 4){
 			
 		} else if (response.selection == 5){
 			
 		} else if (response.selection == 6){
 			
-		} else if (response.selection == 7){
-			
-		} else if(response.selection == 8){
+		} else if(response.selection == 7){
 			toggle = 0;
 			player.sendMessage(`§cWorld Editor Disabled`)
 			world.beforeEvents.playerBreakBlock.unsubscribe(events.get(1))
@@ -97,7 +91,7 @@ function worldeditorMenu(player) {
 
 export function sendStructuresMenu(player){
 	let form = new ActionFormData();
-	form.title("§d§lWorld Editor Commands")
+	form.title("§d§lStructure Commands")
 	form.button(`§a§l> §0§lUndo`)
 	form.button(`§a§l> §0§lRedo`)
 	form.button(`§a§l> §0§lCopy`)
@@ -109,7 +103,7 @@ export function sendStructuresMenu(player){
 	form.button(`§c§l> §0§lBack`)
 	form.show(player).then(response => {
 
-		if (!response.canceled && response.selection > 1) {
+		if (!response.canceled && response.selection > 1 && response.selection < 7) {
 			if (!pos1.has(player.id) || !pos2.has(player.id)) {
 				player.sendMessage(`§aYou must select two valid positions before using these commands.`)
 				return;
@@ -140,7 +134,7 @@ export function sendStructuresMenu(player){
 			form.toggle(`Include Entities`, struct.includeEntities)
 			form.show(player).then(response => {
 				if(!response.canceled){
-					struct.changeConfig(response.formValues[0], response.formValues[1])
+					struct.changeConfig(player, response.formValues[0], response.formValues[1])
 				}
 			})
 		} else if (response.selection == 8) {
