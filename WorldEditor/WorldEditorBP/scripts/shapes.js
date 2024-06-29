@@ -27,6 +27,7 @@ export function sendShapesMenu(player){
     form.button(`§a§l> §0§lCreate Helix`)
     form.button(`§a§l> §0§lCreate Double Helix`)
     form.button(`§a§l> §0§lCreate Outward Spiral`)
+    form.button(`§c§l> §0§lBack`)
     form.show(player).then(response => {
         if(response.selection == 0){
             let form = new ModalFormData();
@@ -376,6 +377,8 @@ export function sendShapesMenu(player){
                     })
                 }
             })
+        } else if(response.selection == 9){
+            editor.worldeditorMenu(player)
         }
     })
 }
