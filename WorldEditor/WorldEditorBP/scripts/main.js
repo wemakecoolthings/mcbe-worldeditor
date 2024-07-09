@@ -164,10 +164,13 @@ world.afterEvents.itemUse.subscribe(ev => {
 		}
 		let blockPerm = block
 
-		if(pickBlock == 1){
+		if (pickBlock == 1){
 			blockset.setPickBlock(ev.source, blockPerm)
 		} else if(pickBlock == 2){
 			maskLib.setMask(ev.source, blockPerm)
+			pickBlock = 0;
+		} else if(pickBlock == 3){
+			brush.setPermutationToBrush(ev.source, blockPerm.type.id, blockPerm)
 			pickBlock = 0;
 		}
 
@@ -225,7 +228,6 @@ function toggleEvents() {
 			interactCD.add(ev.player.id)
 			let loc = { x: ev.block.x, y: ev.block.y, z: ev.block.z }
 			pos2.set(ev.player.id, loc);
-
 			if (pos1.has(ev.player.id)) {
 				let loc2 = pos1.get(ev.player.id);
 				let max1 = Math.max(loc.x, loc2.x);
