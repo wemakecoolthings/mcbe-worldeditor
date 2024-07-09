@@ -1,4 +1,4 @@
-import { BlockVolume, world } from '@minecraft/server';
+import { StructureMirrorAxis, StructureRotation, BlockVolume, world } from '@minecraft/server';
 
 let undoSave = new Map(); // Map to store undo actions
 let redoSave = new Map(); // Map to store redo actions
@@ -41,7 +41,7 @@ export function saveStructures(player, blockSelections, actionId) {
             world.getDimension("overworld"),
             maxLoc,
             minLoc,
-            { includeBlocks: true, includeEntities: false }
+            { includeBlocks: true, includeEntities: false}
         );
     }
 }
