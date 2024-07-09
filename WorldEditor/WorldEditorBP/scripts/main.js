@@ -170,7 +170,7 @@ world.afterEvents.itemUse.subscribe(ev => {
 			maskLib.setMask(ev.source, blockPerm)
 			pickBlock = 0;
 		} else if(pickBlock == 3){
-			brush.setPermutationToBrush(ev.source, blockPerm.type.id, blockPerm)
+			brush.setPermutationToBrush(ev.source, blockPerm, blockPerm)
 			pickBlock = 0;
 		}
 

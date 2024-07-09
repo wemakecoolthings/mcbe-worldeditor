@@ -38,8 +38,6 @@ export function sendBrushMenu(player) {
     form.title("§d§lBrush Commands")
     form.button(`§a§l> §0§lToggle Brush Tools`)
     form.button(`§a§l> §0§lCreate Brush`)
-    form.button(`§a§l> §0§lEdit Brush`)
-    form.button(`§a§l> §0§lRemove Brush`)
     form.button(`§a§l> §0§lList Brushes`)
     form.show(player).then(response => {
         if (response.selection === 0) {
@@ -48,10 +46,6 @@ export function sendBrushMenu(player) {
             sendBrushMakerMenu(player);
         } else if (response.selection === 2) {
             listPlayerBrushes(player);
-        } else if (response.selection === 3) {
-            listPlayerBrushes(player); // Reusing the same function to list and then delete
-        } else if (response.selection === 4) {
-            listPlayerBrushes(player); // Reusing the same function to list all brushes
         }
     })
 }
@@ -177,6 +171,7 @@ function createBrush(player, brushName, brushTool, shape, radius, blockMask, blo
             
             // Check if permutationData exists and format the block type string accordingly
             if (permutationData) {
+                blockTypeString = `§d${type.type.id}`;
                 blockTypeString += ` [+NBT]`;
             }
             
@@ -213,7 +208,22 @@ function listPlayerBrushes(player) {
 function showBrushSettings(player, brush, brushID) {
     let form = new ActionFormData();
     form.title(`§d§lBrush: ${brush.brushName}`);
-    form.body(`§aItem ID: §d${brush.itemID}\n§aShape: §d${brush.shape}\n§aRadius: §d${brush.radius}\n§aBlock Mask: §d${brush.blockMasks.join(", ")}\n§aBlock Gradient: §d${brush.blockGradients.map(([type, weight]) => `${type} -> ${weight}%`).join(", ")}`);
+    
+    // Display basic brush settings
+    let bodyText = `§aItem ID: §d${brush.itemID}\n§aShape: §d${brush.shape}\n§aRadius: §d${brush.radius}\n§aBlock Mask: §d${brush.blockMasks.join(", ")}`;
+
+    // Display block gradients
+    let gradientText = brush.blockGradients.map(([type, weight, permutationData]) => {
+        if (permutationData) {
+            return `§d${type.type.id} [+NBT] -> ${weight}%`;
+        } else {
+            return `§d${type} -> ${weight}%`;
+        }
+    }).join("\n");
+
+    bodyText += `\n§aBlock Gradient:\n${gradientText}`;
+
+    form.body(bodyText);
     form.button("Edit Brush Settings");
     form.button("Delete Brush");
 
@@ -233,12 +243,16 @@ function sendEditBrushMenu(player, brushID) {
 
     let form = new ModalFormData();
     form.title(`§d§lEditing Brush: ${brush.brushName}`);
-    form.textField("Brush Name", brush.brushName);
-    form.textField("Item ID", brush.itemID);
+    form.textField("Brush Name", brush.brushName, brush.brushName);
+    form.textField("Item ID", brush.itemID, brush.itemID);
     form.dropdown("Brush Shape", ["Sphere", "Cube", "Prism"], brush.shape === "sphere" ? 0 : (brush.shape === "cube" ? 1 : 2));
     form.slider("Radius", 1, 6, 1, brush.radius);
-    form.textField("Block Mask (OPTIONAL)", brush.blockMasks.join(","));
-    form.textField("Block Gradient", brush.blockGradients.map(([type, weight]) => `${type},${weight}`).join(","));
+    form.textField("Block Mask (OPTIONAL)", brush.blockMasks.join(","), brush.blockMasks.join(","));
+
+    // Display only non-permutation block types in block gradient
+    let nonPermutationGradients = brush.blockGradients.filter(([type, weight, permutationData]) => !permutationData);
+    let gradientText = nonPermutationGradients.map(([type, weight]) => `${type},${weight}`).join(",");
+    form.textField("Block Gradient", gradientText, gradientText);
 
     // Function to validate gradient input
     function validateGradientInput(input) {
@@ -246,6 +260,8 @@ function sendEditBrushMenu(player, brushID) {
         return regex.test(input);
     }
 
+    form.toggle(`Keep "Pick Block" Additions`, true)
+    form.toggle(`Add New "Pick Block" Additions`, false)
     form.show(player).then(response => {
         if (!response.canceled) {
             let name = response.formValues[0].trim();
@@ -254,6 +270,8 @@ function sendEditBrushMenu(player, brushID) {
             let radius = response.formValues[3];
             let mask = response.formValues[4].trim().split(",");
             let gradient = response.formValues[5].trim();
+            let keepAdditions = response.formValues[6]
+            let addAdditions = response.formValues[7]
 
             if (!validateGradientInput(gradient)) {
                 player.sendMessage("§cInvalid characters in Block Gradient input");
@@ -294,7 +312,25 @@ function sendEditBrushMenu(player, brushID) {
             });
 
             if (!hasDuplicate) {
-                editBrush(player, brushID, name, id, shape, radius, mask, gradients);
+                // Merge gradients with permutations before updating brush settings
+                let updatedGradients = [];
+                
+                // Add user-inputted gradients
+                gradients.forEach(([type, weight]) => {
+                    updatedGradients.push([type, weight]);
+                });
+            
+                // Add block permutations
+                if(keepAdditions){
+                    let permutationGradients = brush.blockGradients.filter(([type, weight, permutationData]) => permutationData);
+                    updatedGradients = updatedGradients.concat(permutationGradients);
+                }
+
+                if(addAdditions){
+                    sendAdditionalBlockMenu(player, name, id, shape, radius, mask, updatedGradients)
+                } else {
+                    editBrush(player, brushID, name, id, shape, radius, mask, updatedGradients);
+                }
             }
         }
     });
@@ -314,8 +350,15 @@ function editBrush(player, brushID, brushName, brushTool, shape, radius, blockMa
     let gradientOutput = "§dNone (DEFAULTS TO DIRT)";
     if (blockGradient.length > 0) {
         gradientOutput = blockGradient.map(block => {
-            let [type, weight] = block;
-            return `§d${type} -> ${weight}%%`;
+            let [type, weight, permutationData] = block; // Added permutationData for checking
+
+            let blockTypeString = `§d${type}`;
+            if (permutationData) {
+                blockTypeString = `§d${type.type.id}`;
+                blockTypeString += ` [+NBT]`;
+            }
+
+            return `§d${blockTypeString} -> ${weight}%%`;
         }).join("\n");
     }
 
@@ -342,55 +385,6 @@ export function setPermutationToBrush(player, blockType, permutationData) {
     brushPermBlock.delete(player.name);
 
     createBrush(player, name, id, shape, radius, mask, gradients);
-}
-
-export function integrateBlockPermutations() {
-    brushPermutations.forEach((permutations, brushID) => {
-        if (brushes.has(brushID)) {
-            const brush = brushes.get(brushID);
-            permutations.forEach(permutation => {
-                const { blockType, permutationData } = permutation;
-                brush.blockGradients.push([blockType, 100, permutationData]); // Assuming default weight of 100 for now
-            });
-        }
-    });
-}
-
-export function listBlockPermutations(player) {
-    let permutationsList = "";
-    brushPermutations.forEach((permutations, brushID) => {
-        permutationsList += `Brush ID: ${brushID}\n`;
-        permutations.forEach(permutation => {
-            const { blockType, permutationData } = permutation;
-            permutationsList += `Block Type: ${blockType} => Permutation Data: ${permutationData}\n`;
-        });
-        permutationsList += "\n";
-    });
-
-    if (permutationsList === "") {
-        player.sendMessage("§cNo block permutations found.");
-    } else {
-        player.sendMessage(`§aBlock Permutations:\n${permutationsList}`);
-    }
-}
-
-export function saveBlockPermutation(brushID, blockType, permutationData) {
-    if (!brushPermutations.has(brushID)) {
-        brushPermutations.set(brushID, []);
-    }
-
-    const permutations = brushPermutations.get(brushID);
-    permutations.push({ blockType, permutationData });
-
-    brushPermutations.set(brushID, permutations);
-}
-
-export function removeBlockPermutation(brushID, blockType) {
-    if (brushPermutations.has(brushID)) {
-        let permutations = brushPermutations.get(brushID);
-        permutations = permutations.filter(permutation => permutation.blockType !== blockType);
-        brushPermutations.set(brushID, permutations);
-    }
 }
 
 function generateDefaultBrushName(playerName) {
@@ -427,14 +421,13 @@ function brushAction(player, brushTool) {
 
         // Determine the gradients to use, considering block permutations
         let gradients = brushSettings.blockGradients;
-        const brushPermutation = brushPermutations.get(brushID);
-        if (brushPermutation && brushPermutation.length > 0) {
-            // Incorporate permutations into the gradients
-            brushPermutation.forEach(permutation => {
-                let { permutationData } = permutation;
-                gradients.push([permutationData, 100]); // Assuming default weight of 100 for now
-            });
-        }
+        // Incorporate permutations into the gradients
+        gradients.forEach(permutation => {
+            let [ blockType, weight, permutationData ] = permutation;
+            if(permutationData){
+                permutation.blockType = permutationData
+            }
+        });
 
         let blocksToReplace = getBlocksToReplace(posx, posy, posz, radius, shape, mask, player.dimension);
         const dimension = player.dimension;
