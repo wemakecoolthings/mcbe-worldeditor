@@ -1,8 +1,12 @@
-import { world, system } from '@minecraft/server';
-import { ActionFormData, ModalFormData } from '@minecraft/server-ui'
+import { world, system, BlockVolume, BlockPermutation, Block } from '@minecraft/server';
+import { ActionFormData, ModalFormData } from '@minecraft/server-ui';
+import * as editor from './main';
+import * as action from './actionSave'
 
 let brushes = new Map(); // Stores all brushes by their ID
 let brushMode = new Map(); // Tracks whether brush mode is enabled for a player
+let brushPermBlock = new Map();
+let brushPermutations = new Map(); // Stores block permutations separately
 let brushOpt1 = new Map(); // Include liquid blocks option
 let brushOpt2 = new Map(); // Include passable blocks option
 
@@ -17,7 +21,7 @@ world.afterEvents.itemUse.subscribe(ev => {
     }
 
     if (brushMode.has(player.name) && !brushTool.includes("slab") && !brushTool.includes("stairs") && !brushTool.includes("block") && brushTool !== "wooden_axe" && brushTool !== "we:world_editor") {
-        if (player.hasTag("worldeditor") && brushMode.get(player.name) == true) {
+        if (player.hasTag("worldeditor") && brushMode.get(player.name) === true) {
             if (brushes.has(`${player.name}_${brushTool}`)) {
                 brushAction(player, brushTool);
             } else {
@@ -25,30 +29,31 @@ world.afterEvents.itemUse.subscribe(ev => {
             }
         }
     } else if(brushes.has(`${player.name}_${brushTool}`)){
-		player.sendMessage(`§cBrushes are currently toggled off, you can enable them in the brush menu.`);
-	}
+        player.sendMessage(`§cBrushes are currently toggled off, you can enable them in the brush menu.`);
+    }
 });
 
-
-export function sendBrushMenu(player){
-	let form = new ActionFormData();
-	form.title("§d§lBrush Commands")
-	form.button(`§a§l> §0§lToggle Brush Tools`)
-	form.button(`§a§l> §0§lCreate Brush`)
-	form.button(`§a§l> §0§lEdit Brush`)
-	form.button(`§a§l> §0§lRemove Brush`)
-	form.show(player).then(response => {
-		if(response.selection == 0){
-			toggleBrushMode(player)
-		} else if(response.selection == 1){
-			sendBrushMakerMenu(player)
-		}
-	})
-}
-
-// Function to set brush settings
-function editBrushSettings(player) {
-    
+export function sendBrushMenu(player) {
+    let form = new ActionFormData();
+    form.title("§d§lBrush Commands")
+    form.button(`§a§l> §0§lToggle Brush Tools`)
+    form.button(`§a§l> §0§lCreate Brush`)
+    form.button(`§a§l> §0§lEdit Brush`)
+    form.button(`§a§l> §0§lRemove Brush`)
+    form.button(`§a§l> §0§lList Brushes`)
+    form.show(player).then(response => {
+        if (response.selection === 0) {
+            toggleBrushMode(player);
+        } else if (response.selection === 1) {
+            sendBrushMakerMenu(player);
+        } else if (response.selection === 2) {
+            listPlayerBrushes(player);
+        } else if (response.selection === 3) {
+            listPlayerBrushes(player); // Reusing the same function to list and then delete
+        } else if (response.selection === 4) {
+            listPlayerBrushes(player); // Reusing the same function to list all brushes
+        }
+    })
 }
 
 function toggleBrushMode(player) {
@@ -66,51 +71,50 @@ function sendBrushMakerMenu(player) {
     form.title("§d§lBrush Maker");
     form.textField(`Brush Name`, "");
     form.textField(`Item ID`, 'blaze_powder');
-    form.dropdown(`Brush Shape`, ["Sphere", "Cube", "Prism", "Helix"]);
+    form.dropdown(`Brush Shape`, ["Sphere", "Cube", "Prism"]);
     form.slider(`Radius`, 1, 6, 1, 3);
-    form.textField(`Block Mask (OPTIONAL)`, "grass_block,stone");
-    form.textField(`Block Gradient`, "grass_block:50,stone");
+    form.textField(`Block Mask (OPTIONAL)`, "grass_block,dirt");
+    form.textField(`Block Gradient`, "dirt");
 
     // Function to validate gradient input
     function validateGradientInput(input) {
-        // Regular expression to match alphanumeric characters, commas, underscores, and colons
         const regex = /^[a-zA-Z0-9,_:\s]*$/;
         return regex.test(input);
     }
 
     form.show(player).then(response => {
         if (!response.canceled) {
-            // Extract form values
             let name = response.formValues[0].trim();
             let id = response.formValues[1].trim();
             let shape = response.formValues[2];
             let radius = response.formValues[3];
-            
-            // Process mask and gradient
             let mask = response.formValues[4].trim().split(",");
-            
             let gradient = response.formValues[5].trim();
+
             if (!validateGradientInput(gradient)) {
                 player.sendMessage("§cInvalid characters in Block Gradient input");
                 return;
             }
-            
-            gradient = gradient.split(",").map(block => {
-                let parts = block.split(":");
-                let type = parts[0].trim();
-                let weight = parts.length > 1 ? parseFloat(parts[1]) : 100; // Default weight to 100 if not specified
-                return [type, weight];
-            });
 
-            // Generate a default brush name if empty
+            let gradients = [];
+
+            if (gradient !== "") {
+                let items = gradient.split(",");
+                for (let i = 0; i < items.length; i += 2) {
+                    let block = items[i];
+                    let weight = items[i + 1];
+                    gradients.push([block, weight]);
+                }
+            } else {
+                gradients = [["dirt", 100]];
+            }
+
             if (name === "") {
                 name = generateDefaultBrushName(player.name);
             }
 
-            // Shape ID
-            shape = ["sphere", "cube", "prism", "helix"][shape];
+            shape = ["sphere", "cube", "prism"][shape];
 
-            // Check for duplicate names or item IDs
             let hasDuplicate = false;
             brushes.forEach((value, key) => {
                 if (key.startsWith(player.name)) {
@@ -125,36 +129,31 @@ function sendBrushMakerMenu(player) {
                 }
             });
 
-            // Create the brush if no duplicates
             if (!hasDuplicate) {
-                createBrush(player, name, id, shape, radius, mask, gradient);
+                createBrush(player, name, id, shape, radius, mask, gradients);
+                sendAdditionalBlockMenu(player, name, id, shape, radius, mask, gradients);
             }
         }
     });
 }
 
+function sendAdditionalBlockMenu(player, name, id, shape, radius, mask, gradients) {
+    let form = new ActionFormData();
+    form.title("§d§lAdditional Blocks");
+    form.button(`§a§l> §r§lAdd Additional Blocks Using "Pick Block" Tool!`);
+    form.button(`§a§l> §r§lConfirm Selection!`);
 
-function generateDefaultBrushName(playerId) {
-    let defaultName = "brush";
-    let brushNumber = 1;
-    let nameExists = true;
-
-    while (nameExists) {
-        nameExists = false;
-        let generatedName = `${defaultName}${brushNumber}`;
-
-        brushes.forEach((value, key) => {
-            if (key.startsWith(playerId) && value.brushName === generatedName) {
-                nameExists = true;
+    form.show(player).then(response => {
+        if (!response.canceled) {
+            if (response.selection === 0) {
+                player.sendMessage(`§aUse worldeditor to grab block!`);
+                editor.setPickBlock(3); // Start pick block process
+                brushPermBlock.set(player.name, { name, id, shape, radius, mask, gradients }); // Save current brush settings
+            } else if (response.selection === 1) {
+                player.sendMessage(`§aBrush "${name}" created successfully with additional blocks!`);
             }
-        });
-
-        if (!nameExists) {
-            return generatedName;
         }
-
-        brushNumber++;
-    }
+    });
 }
 
 function createBrush(player, brushName, brushTool, shape, radius, blockMask, blockGradient) {
@@ -170,7 +169,149 @@ function createBrush(player, brushName, brushTool, shape, radius, blockMask, blo
 
     let maskOutput = blockMask.filter(Boolean).length > 0 ? `§d${blockMask.filter(Boolean).join(", ")}` : "§dNone";
 
-    let gradientOutput = "§dNone (DEFAULTS TO STONE)";
+    let gradientOutput = "§dNone (DEFAULTS TO DIRT)";
+    if (blockGradient.length > 0) {
+        gradientOutput = blockGradient.map(block => {
+            let [type, weight, permutationData] = block; // Added permutationData for checking
+            let blockTypeString = `§d${type}`;
+            
+            // Check if permutationData exists and format the block type string accordingly
+            if (permutationData) {
+                blockTypeString += ` [+NBT]`;
+            }
+            
+            return `${blockTypeString} -> ${weight}%%`;
+        }).join("\n");
+    }
+
+    player.sendMessage(`§aCreated new brush called §d${brushName} §aattached to §d${brushTool}\n\n§aBrush Settings:\n§aShape Selection: §d${shape}\n§aRadius: §d${radius}\n§aBlocks Masked:\n${maskOutput}\n§aBlock Gradient:\n${gradientOutput}\n\n§dYou can edit your brush to add specific block types.`);
+}
+
+
+function listPlayerBrushes(player) {
+    let playerBrushes = Array.from(brushes.entries()).filter(([key, value]) => key.startsWith(player.name));
+    if (playerBrushes.length === 0) {
+        player.sendMessage("§cYou don't have any brushes.");
+        return;
+    }
+
+    let form = new ActionFormData();
+    form.title("§d§lYour Brushes");
+
+    playerBrushes.forEach(([key, brush]) => {
+        form.button(`${brush.brushName} (${brush.itemID})`);
+    });
+
+    form.show(player).then(response => {
+        if (!response.canceled) {
+            let selectedBrush = playerBrushes[response.selection];
+            showBrushSettings(player, selectedBrush[1], selectedBrush[0]);
+        }
+    });
+}
+
+function showBrushSettings(player, brush, brushID) {
+    let form = new ActionFormData();
+    form.title(`§d§lBrush: ${brush.brushName}`);
+    form.body(`§aItem ID: §d${brush.itemID}\n§aShape: §d${brush.shape}\n§aRadius: §d${brush.radius}\n§aBlock Mask: §d${brush.blockMasks.join(", ")}\n§aBlock Gradient: §d${brush.blockGradients.map(([type, weight]) => `${type} -> ${weight}%`).join(", ")}`);
+    form.button("Edit Brush Settings");
+    form.button("Delete Brush");
+
+    form.show(player).then(response => {
+        if (!response.canceled) {
+            if (response.selection === 0) {
+                sendEditBrushMenu(player, brushID);
+            } else if (response.selection === 1) {
+                deleteBrush(player, brushID);
+            }
+        }
+    });
+}
+
+function sendEditBrushMenu(player, brushID) {
+    const brush = brushes.get(brushID);
+
+    let form = new ModalFormData();
+    form.title(`§d§lEditing Brush: ${brush.brushName}`);
+    form.textField("Brush Name", brush.brushName);
+    form.textField("Item ID", brush.itemID);
+    form.dropdown("Brush Shape", ["Sphere", "Cube", "Prism"], brush.shape === "sphere" ? 0 : (brush.shape === "cube" ? 1 : 2));
+    form.slider("Radius", 1, 6, 1, brush.radius);
+    form.textField("Block Mask (OPTIONAL)", brush.blockMasks.join(","));
+    form.textField("Block Gradient", brush.blockGradients.map(([type, weight]) => `${type},${weight}`).join(","));
+
+    // Function to validate gradient input
+    function validateGradientInput(input) {
+        const regex = /^[a-zA-Z0-9,_:\s]*$/;
+        return regex.test(input);
+    }
+
+    form.show(player).then(response => {
+        if (!response.canceled) {
+            let name = response.formValues[0].trim();
+            let id = response.formValues[1].trim();
+            let shape = response.formValues[2];
+            let radius = response.formValues[3];
+            let mask = response.formValues[4].trim().split(",");
+            let gradient = response.formValues[5].trim();
+
+            if (!validateGradientInput(gradient)) {
+                player.sendMessage("§cInvalid characters in Block Gradient input");
+                return;
+            }
+
+            let gradients = [];
+
+            if (gradient !== "") {
+                let items = gradient.split(",");
+                for (let i = 0; i < items.length; i += 2) {
+                    let block = items[i];
+                    let weight = items[i + 1];
+                    gradients.push([block, weight]);
+                }
+            } else {
+                gradients = [["dirt", 100]];
+            }
+
+            if (name === "") {
+                name = generateDefaultBrushName(player.name);
+            }
+
+            shape = ["sphere", "cube", "prism"][shape];
+
+            let hasDuplicate = false;
+            brushes.forEach((value, key) => {
+                if (key !== brushID && key.startsWith(player.name)) {
+                    if (value.brushName === name) {
+                        player.sendMessage(`§cA brush with the name "${name}" already exists.`);
+                        hasDuplicate = true;
+                    }
+                    if (value.itemID === id) {
+                        player.sendMessage(`§cA brush with the item ID "${id}" already exists.`);
+                        hasDuplicate = true;
+                    }
+                }
+            });
+
+            if (!hasDuplicate) {
+                editBrush(player, brushID, name, id, shape, radius, mask, gradients);
+            }
+        }
+    });
+}
+
+function editBrush(player, brushID, brushName, brushTool, shape, radius, blockMask, blockGradient) {
+    const brush = brushes.get(brushID);
+    brush.brushName = brushName;
+    brush.itemID = brushTool;
+    brush.shape = shape;
+    brush.radius = radius;
+    brush.blockMasks = blockMask;
+    brush.blockGradients = blockGradient;
+
+    let maskOutput = blockMask.filter(Boolean).length > 0 ? `§d${blockMask.filter(Boolean).join(", ")}` : "§dNone";
+
+    let gradientOutput = "§dNone (DEFAULTS TO DIRT)";
     if (blockGradient.length > 0) {
         gradientOutput = blockGradient.map(block => {
             let [type, weight] = block;
@@ -178,10 +319,90 @@ function createBrush(player, brushName, brushTool, shape, radius, blockMask, blo
         }).join("\n");
     }
 
-    player.sendMessage(`§aCreated new brush called §d${brushName} §aattached to §d${brushTool}\n\n§aBrush Settings:\n§aShape Selection: §d${shape}\n§aRadius: §d${radius}\n§aBlocks Masked:\n${maskOutput}\n§aBlock Gradient:\n${gradientOutput}`);
+    player.sendMessage(`§aEdited brush "${brushName}" (${brushTool}) successfully.\n\n§aUpdated Settings:\n§aShape Selection: §d${shape}\n§aRadius: §d${radius}\n§aBlocks Masked:\n${maskOutput}\n§aBlock Gradient:\n${gradientOutput}\n\n§dYou can continue editing or use 'apply' or other functions to set the new brushes.`);
+
+    brushPermBlock.set(player.name, brush);
 }
 
-// Function to handle brush actions
+function deleteBrush(player, brushID) {
+    brushes.delete(brushID);
+    player.sendMessage(`§cBrush deleted successfully.`);
+}
+
+export function setPermutationToBrush(player, blockType, permutationData) {
+    if (!brushPermBlock.has(player.name)) {
+        player.sendMessage(`§cNo active brush to modify.`);
+        return;
+    }
+
+    const { name, id, shape, radius, mask, gradients } = brushPermBlock.get(player.name);
+
+    gradients.push([blockType, 100, permutationData]);
+
+    brushPermBlock.delete(player.name);
+
+    createBrush(player, name, id, shape, radius, mask, gradients);
+}
+
+export function integrateBlockPermutations() {
+    brushPermutations.forEach((permutations, brushID) => {
+        if (brushes.has(brushID)) {
+            const brush = brushes.get(brushID);
+            permutations.forEach(permutation => {
+                const { blockType, permutationData } = permutation;
+                brush.blockGradients.push([blockType, 100, permutationData]); // Assuming default weight of 100 for now
+            });
+        }
+    });
+}
+
+export function listBlockPermutations(player) {
+    let permutationsList = "";
+    brushPermutations.forEach((permutations, brushID) => {
+        permutationsList += `Brush ID: ${brushID}\n`;
+        permutations.forEach(permutation => {
+            const { blockType, permutationData } = permutation;
+            permutationsList += `Block Type: ${blockType} => Permutation Data: ${permutationData}\n`;
+        });
+        permutationsList += "\n";
+    });
+
+    if (permutationsList === "") {
+        player.sendMessage("§cNo block permutations found.");
+    } else {
+        player.sendMessage(`§aBlock Permutations:\n${permutationsList}`);
+    }
+}
+
+export function saveBlockPermutation(brushID, blockType, permutationData) {
+    if (!brushPermutations.has(brushID)) {
+        brushPermutations.set(brushID, []);
+    }
+
+    const permutations = brushPermutations.get(brushID);
+    permutations.push({ blockType, permutationData });
+
+    brushPermutations.set(brushID, permutations);
+}
+
+export function removeBlockPermutation(brushID, blockType) {
+    if (brushPermutations.has(brushID)) {
+        let permutations = brushPermutations.get(brushID);
+        permutations = permutations.filter(permutation => permutation.blockType !== blockType);
+        brushPermutations.set(brushID, permutations);
+    }
+}
+
+function generateDefaultBrushName(playerName) {
+    let defaultName = `${playerName}'s Brush`;
+    let count = 1;
+    while (brushes.has(`${playerName}_${defaultName}`)) {
+        defaultName = `${playerName}'s Brush ${count}`;
+        count++;
+    }
+    return defaultName;
+}
+
 function brushAction(player, brushTool) {
     try {
         const brushID = `${player.name}_${brushTool}`;
@@ -204,32 +425,56 @@ function brushAction(player, brushTool) {
         let shape = brushSettings.shape;
         let mask = brushSettings.blockMasks;
 
+        // Determine the gradients to use, considering block permutations
+        let gradients = brushSettings.blockGradients;
+        const brushPermutation = brushPermutations.get(brushID);
+        if (brushPermutation && brushPermutation.length > 0) {
+            // Incorporate permutations into the gradients
+            brushPermutation.forEach(permutation => {
+                let { permutationData } = permutation;
+                gradients.push([permutationData, 100]); // Assuming default weight of 100 for now
+            });
+        }
+
         let blocksToReplace = getBlocksToReplace(posx, posy, posz, radius, shape, mask, player.dimension);
         const dimension = player.dimension;
 
+        if (blocksToReplace.length === 0) {
+            player.sendMessage(`§cNo blocks found to replace.`);
+            return;
+        }
+
+        // Function to replicate objects based on weight
+        function weight(arr) {
+            return [].concat(...arr.map(obj => Array(Math.ceil(obj[1] * 100)).fill(obj)));
+        }
+
+        // Function to pick a random object from weighted array
+        function pick(arr) {
+            let weighted = weight(arr);
+            return weighted[Math.floor(Math.random() * weighted.length)];
+        }
+
+        // Undo Action
+        let sections = []
         blocksToReplace.forEach(block => {
             let [x, y, z] = block;
-            if (brushSettings.blockGradients.length > 0) {
-                let randomBlockFromGradient = Math.floor(Math.random() * brushSettings.blockGradients.length);
-                let blockType = brushSettings.blockGradients[randomBlockFromGradient][0];
-                let weight = brushSettings.blockGradients[randomBlockFromGradient][1];
-                while (weight / 100 < Math.random()) {
-                    randomBlockFromGradient = Math.floor(Math.random() * brushSettings.blockGradients.length);
-                    blockType = brushSettings.blockGradients[randomBlockFromGradient][0];
-                    weight = brushSettings.blockGradients[randomBlockFromGradient][1];
-                }
-                const blockVolume = {
-                    min: { x: x, y: y, z: z },
-                    max: { x: x, y: y, z: z }
-                };
-                dimension.fillBlocks(blockVolume, blockType, { ignoreChunkBoundErrors: true });
-            } else {
-                const blockVolume = {
-                    min: { x: x, y: y, z: z },
-                    max: { x: x, y: y, z: z }
-                };
-                dimension.fillBlocks(blockVolume, "minecraft:stone", { ignoreChunkBoundErrors: true });
-            }
+            let blockVolume = new BlockVolume({ x: x, y: y, z: z }, { x: x, y: y, z: z });
+            sections.push(blockVolume)
+        });
+        action.saveAction(player, sections)
+
+        // Usage example within your block selection loop
+        blocksToReplace.forEach(block => {
+            let [x, y, z] = block;
+
+            // Use the pick function to select a block type based on gradients
+            let chosenBlock = pick(gradients);
+            let blockType = chosenBlock[0]; // Type is the first element of the chosen block object
+
+            // Create a BlockVolume for the current block coordinate and fill it with blockType
+            let blockVolume = new BlockVolume({ x: x, y: y, z: z }, { x: x, y: y, z: z });
+            dimension.fillBlocks(blockVolume, blockType, { ignoreChunkBoundErrors: true });
         });
 
         player.sendMessage(`§aBrush action completed`);
@@ -239,17 +484,17 @@ function brushAction(player, brushTool) {
 }
 
 // Function to get blocks to replace
-function getBlocksToReplace(posx, posy, posz, radius, shape, mask, dimension) {
+function getBlocksToReplace(posx, posy, posz, radius, shape, masks, dimension) {
     let blocks = [];
-
     switch (shape) {
         case 'sphere':
             for (let y = posy - radius; y <= posy + radius; y++) {
                 for (let x = posx - radius; x <= posx + radius; x++) {
                     for (let z = posz - radius; z <= posz + radius; z++) {
                         let dist = Math.sqrt((posx - x) ** 2 + (posy - y) ** 2 + (posz - z) ** 2);
-                        if (dist <= radius) {
-                            if (mask.length === 0 || mask.includes(dimension.getBlock({ x, y, z }).typeId)) {
+                        if (dist-0.5 <= radius) {
+                            let blockTypeId = dimension.getBlock({ x, y, z }).typeId;
+                            if (masks.length === 0 || isBlockInMasks(blockTypeId, masks)) {
                                 blocks.push([x, y, z]);
                             }
                         }
@@ -262,7 +507,8 @@ function getBlocksToReplace(posx, posy, posz, radius, shape, mask, dimension) {
             for (let y = posy - radius; y <= posy + radius; y++) {
                 for (let x = posx - radius; x <= posx + radius; x++) {
                     for (let z = posz - radius; z <= posz + radius; z++) {
-                        if (mask.length === 0 || mask.includes(dimension.getBlock({ x, y, z }).typeId)) {
+                        let blockTypeId = dimension.getBlock({ x, y, z }).typeId;
+                        if (masks.length === 0 || isBlockInMasks(blockTypeId, masks)) {
                             blocks.push([x, y, z]);
                         }
                     }
@@ -270,41 +516,17 @@ function getBlocksToReplace(posx, posy, posz, radius, shape, mask, dimension) {
             }
             break;
 
-        case 'pyramid':
+        case 'prism':
             for (let y = posy; y <= posy + radius; y++) {
                 let levelRadius = radius - (y - posy);
                 for (let x = posx - levelRadius; x <= posx + levelRadius; x++) {
                     for (let z = posz - levelRadius; z <= posz + levelRadius; z++) {
-                        if (mask.length === 0 || mask.includes(dimension.getBlock({ x, y, z }).typeId)) {
+                        let blockTypeId = dimension.getBlock({ x, y, z }).typeId;
+                        if (masks.length === 0 || isBlockInMasks(blockTypeId, masks)) {
                             blocks.push([x, y, z]);
                         }
                     }
                 }
-            }
-            break;
-
-        case 'helix':
-            const turns = 3; // Number of turns of the helix
-            const height = radius * 2;
-            const angleStep = (2 * Math.PI) / 10; // Controls the density of the helix
-
-            for (let y = posy; y <= posy + height; y++) {
-                let angle = (y - posy) * (turns / height) * 2 * Math.PI;
-                let helixX = posx + Math.cos(angle) * radius;
-                let helixZ = posz + Math.sin(angle) * radius;
-                let helixCoords = [
-                    Math.floor(helixX), y, Math.floor(helixZ),
-                    Math.ceil(helixX), y, Math.ceil(helixZ)
-                ];
-                helixCoords.forEach((coord, index) => {
-                    if (index % 3 === 0) {
-                        let x = coord;
-                        let z = helixCoords[index + 2];
-                        if (mask.length === 0 || mask.includes(dimension.getBlock({ x, y, z }).typeId)) {
-                            blocks.push([x, y, z]);
-                        }
-                    }
-                });
             }
             break;
 
@@ -313,4 +535,9 @@ function getBlocksToReplace(posx, posy, posz, radius, shape, mask, dimension) {
     }
 
     return blocks;
+}
+
+// Helper function to check if a block type is in any of the masks
+function isBlockInMasks(blockTypeId, masks) {
+    return masks.some(mask => blockTypeId.includes(mask));
 }
