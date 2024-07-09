@@ -270,6 +270,12 @@ export function pasteArea(player) {
         const structures = world.structureManager.getWorldStructureIds();
         const playerPosition = player.location;
 
+        // Determine rotation
+        const rotation = rotations.has(player.id) ? rotations.get(player.id) : StructureRotation.None;
+
+        // Determine flip
+        const flip = flips.has(player.id) ? flips.get(player.id) : StructureMirrorAxis.None;
+
         // Save relative positions to undo function
         const blockSelections = [];
         for (const structureId of structures) {
@@ -277,8 +283,8 @@ export function pasteArea(player) {
                 const { relativeMinLoc, relativeMaxLoc } = copyData.get(structureId);
 
                 // Calculate new positions based on player's current position
-                const newMinLoc = calculateNewPosition(playerPosition, relativeMinLoc);
-                const newMaxLoc = calculateNewPosition(playerPosition, relativeMaxLoc);
+                const newMinLoc = calculateNewUndoPosition(playerPosition, relativeMinLoc, rotation, flip);
+                const newMaxLoc = calculateNewUndoPosition(playerPosition, relativeMaxLoc, rotation, flip);
 
                 const newSection = new BlockVolume(newMinLoc, newMaxLoc);
                 blockSelections.push(newSection);
@@ -287,23 +293,25 @@ export function pasteArea(player) {
 
         actions.saveAction(player, blockSelections);
 
-        // Determine rotation
-        const rotation = rotations.has(player.id) ? rotations.get(player.id) : StructureRotation.None;
-
-        // Determine flip
-        const flip = flips.has(player.id) ? flips.get(player.id) : StructureMirrorAxis.None;
-
         for (const structureId of structures) {
             if (structureId.includes(copyID)) {
-                const { relativeMinLoc } = copyData.get(structureId);
+                const { relativeMinLoc, relativeMaxLoc } = copyData.get(structureId);
 
                 // Calculate new position based on player's current position
-                const newMinLoc = calculateNewPosition(playerPosition, relativeMinLoc);
+                const newMinLoc = calculateNewUndoPosition(playerPosition, relativeMinLoc, rotation, flip);
+                const newMaxLoc = calculateNewUndoPosition(playerPosition, relativeMaxLoc, rotation, flip);
+
+                // Find the smallest coordinates
+                const smallestLoc = {
+                    x: Math.min(newMinLoc.x, newMaxLoc.x),
+                    y: Math.min(newMinLoc.y, newMaxLoc.y),
+                    z: Math.min(newMinLoc.z, newMaxLoc.z)
+                };
 
                 world.structureManager.place(
                     structureId,
                     player.dimension,
-                    newMinLoc,
+                    smallestLoc,
                     { includeBlocks, includeEntities, rotation, mirror: flip }
                 );
             }
@@ -322,4 +330,37 @@ function calculateNewPosition(playerPosition, relativeLoc) {
         y: Math.round(playerPosition.y + relativeLoc.y),
         z: Math.round(playerPosition.z + relativeLoc.z)
     };
+}
+
+function calculateNewUndoPosition(playerPosition, relativeLoc, rotation, flip) {
+    let newPosition = {
+        x: playerPosition.x + relativeLoc.x,
+        y: playerPosition.y + relativeLoc.y,
+        z: playerPosition.z + relativeLoc.z
+    };
+
+    // Apply flip
+    if (flip === StructureMirrorAxis.X || flip === StructureMirrorAxis.XZ) {
+        newPosition.x = playerPosition.x - relativeLoc.x;
+    }
+    if (flip === StructureMirrorAxis.Z || flip === StructureMirrorAxis.XZ) {
+        newPosition.z = playerPosition.z - relativeLoc.z;
+    }
+
+    // Apply rotation
+    if (rotation === StructureRotation.Rotate90) {
+        [newPosition.x, newPosition.z] = [playerPosition.x - relativeLoc.z, playerPosition.z + relativeLoc.x];
+    } else if (rotation === StructureRotation.Rotate180) {
+        newPosition.x = playerPosition.x + relativeLoc.x;
+        newPosition.z = playerPosition.z + relativeLoc.z;
+    } else if (rotation === StructureRotation.Rotate270) {
+        [newPosition.x, newPosition.z] = [playerPosition.x + relativeLoc.z, playerPosition.z - relativeLoc.x];
+    }
+
+    // Round the coordinates
+    newPosition.x = Math.round(newPosition.x);
+    newPosition.y = Math.round(newPosition.y);
+    newPosition.z = Math.round(newPosition.z);
+    
+    return newPosition;
 }
