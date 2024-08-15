@@ -32,8 +32,6 @@ Current Features
 - Pack is disabled by default for performance
   - Enabled by clicking the World Editor
   - Disabled via the menu opened by the World Editor
-
-Features To-Do List:
 - Support for dynamic brush tools
 - Support for different brush types / patterns
 - Support to set multiple blocks without the brush tool
@@ -41,14 +39,11 @@ Features To-Do List:
   - Set Block Gradient
   - Set Brush Radius
   - Set Brush Detect Options (like allowing passable blocks)
-- More shape generators
-- Replacenear
+
+Features To-Do List (ON HOLD FOR NOW):
 - Drain
 - Snow
 - Thaw
-- Schem Save
-- Scham Load
-- Scham List
 - Center
 - Stack
 - Walls
