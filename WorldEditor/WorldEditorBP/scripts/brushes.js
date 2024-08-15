@@ -152,36 +152,82 @@ function sendAdditionalBlockMenu(player, name, id, shape, radius, mask, gradient
 
 function createBrush(player, brushName, brushTool, shape, radius, blockMask, blockGradient) {
     const brushID = `${player.name}_${brushTool}`;
+    
+    // Ensure blockGradient includes default percentages where necessary
+    const { updatedBlockGradients, additionalBlocks } = processBlockGradient(blockGradient);
+
     brushes.set(brushID, {
         brushName: brushName,
         itemID: brushTool,
         shape: shape,
         radius: radius,
         blockMasks: blockMask,
-        blockGradients: blockGradient
+        blockGradients: updatedBlockGradients
     });
 
+    // Format output
     let maskOutput = blockMask.filter(Boolean).length > 0 ? `§d${blockMask.filter(Boolean).join(", ")}` : "§dNone";
 
     let gradientOutput = "§dNone (DEFAULTS TO DIRT)";
-    if (blockGradient.length > 0) {
-        gradientOutput = blockGradient.map(block => {
+    if (updatedBlockGradients.length > 0) {
+        gradientOutput = updatedBlockGradients.map(block => {
             let [type, weight, permutationData] = block; // Added permutationData for checking
+
             let blockTypeString = `§d${type}`;
-            
-            // Check if permutationData exists and format the block type string accordingly
             if (permutationData) {
                 blockTypeString = `§d${type.type.id}`;
                 blockTypeString += ` [+NBT]`;
             }
-            
-            return `${blockTypeString} -> ${weight}%%`;
+
+            return `§d${blockTypeString} -> ${weight}%%`;
         }).join("\n");
     }
 
     player.sendMessage(`§aCreated new brush called §d${brushName} §aattached to §d${brushTool}\n\n§aBrush Settings:\n§aShape Selection: §d${shape}\n§aRadius: §d${radius}\n§aBlocks Masked:\n${maskOutput}\n§aBlock Gradient:\n${gradientOutput}\n\n§dYou can edit your brush to add specific block types.`);
 }
 
+function processBlockGradient(blockGradient) {
+    let totalPercentage = 0;
+    let blocksWithDefinedPercentage = [];
+    let blocksWithDefaultPercentage = [];
+    let additionalBlocks = [];
+
+    // Process each block gradient
+    blockGradient.forEach(block => {
+        let [type, weight, permutationData] = block;
+
+        // If weight is missing or invalid, assign default weight of 50
+        if (isNaN(weight) || weight === undefined || weight === null) {
+            additionalBlocks.push([weight, 50, permutationData]);
+            weight = 50;
+            additionalBlocks.push([type, weight, permutationData]);
+        } else {
+            weight = parseInt(weight, 10);
+            if (weight > 0) {
+                totalPercentage += weight;
+                blocksWithDefinedPercentage.push([type, weight, permutationData]);
+            } else {
+                blocksWithDefaultPercentage.push([type, weight, permutationData]);
+            }
+        }
+    });
+
+    // Calculate missing percentage and distribute it
+    const missingPercentage = 100 - totalPercentage;
+    const numBlocksWithDefault = blocksWithDefaultPercentage.length;
+
+    if (numBlocksWithDefault > 0) {
+        const defaultWeight = Math.floor(missingPercentage / numBlocksWithDefault);
+        blocksWithDefaultPercentage.forEach((block, index) => {
+            block[1] = defaultWeight;
+        });
+    }
+
+    // Combine blocks with defined percentages, updated blocks with default percentages, and additional blocks
+    const updatedBlockGradients = [...blocksWithDefinedPercentage, ...blocksWithDefaultPercentage, ...additionalBlocks];
+
+    return { updatedBlockGradients, additionalBlocks };
+}
 
 function listPlayerBrushes(player) {
     let playerBrushes = Array.from(brushes.entries()).filter(([key, value]) => key.startsWith(player.name));
@@ -343,14 +389,18 @@ function editBrush(player, brushID, brushName, brushTool, shape, radius, blockMa
     brush.shape = shape;
     brush.radius = radius;
     brush.blockMasks = blockMask;
-    brush.blockGradients = blockGradient;
 
+    // Process block gradients and handle undefined percentages
+    const { updatedBlockGradients } = processBlockGradient(blockGradient);
+
+    // Format the output for block masks
     let maskOutput = blockMask.filter(Boolean).length > 0 ? `§d${blockMask.filter(Boolean).join(", ")}` : "§dNone";
 
+    // Format the output for block gradients
     let gradientOutput = "§dNone (DEFAULTS TO DIRT)";
-    if (blockGradient.length > 0) {
-        gradientOutput = blockGradient.map(block => {
-            let [type, weight, permutationData] = block; // Added permutationData for checking
+    if (updatedBlockGradients.length > 0) {
+        gradientOutput = updatedBlockGradients.map(block => {
+            let [type, weight, permutationData] = block;
 
             let blockTypeString = `§d${type}`;
             if (permutationData) {
@@ -366,6 +416,7 @@ function editBrush(player, brushID, brushName, brushTool, shape, radius, blockMa
 
     brushPermBlock.set(player.name, brush);
 }
+
 
 function deleteBrush(player, brushID) {
     brushes.delete(brushID);

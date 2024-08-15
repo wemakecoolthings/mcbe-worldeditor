@@ -31,9 +31,6 @@ export function worldeditorMenu(player) {
 	form.button(`§a§l> §0§lStructure Commands`)
 	form.button(`§a§l> §0§lShapes Commands`)
 	form.button(`§a§l> §0§lBrush Commands`)
-	form.button(`§a§l> §0§lTerrain Commands`)
-	form.button(`§a§l> §0§lNavigation Commands`)
-	form.button(`§a§l> §0§lInfo Commands`)
 	form.button(`§a§l> §0§lDisable World Editor`)
 	form.show(player).then(response => {
 
@@ -74,13 +71,7 @@ export function worldeditorMenu(player) {
 			shapes.sendShapesMenu(player)
 		} else if (response.selection == 3){
 			brush.sendBrushMenu(player)
-		} else if (response.selection == 4){
-			
-		} else if (response.selection == 5){
-			
-		} else if (response.selection == 6){
-			
-		} else if(response.selection == 7){
+		} else if(response.selection == 4){
 			toggle = 0;
 			player.sendMessage(`§cWorld Editor Disabled`)
 			world.beforeEvents.playerBreakBlock.unsubscribe(events.get(1))
