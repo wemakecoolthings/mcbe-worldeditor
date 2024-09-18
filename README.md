@@ -3,7 +3,7 @@ A free-to-use Minecraft Bedrock worldedit addon made by WMCT! This tool was made
 
 # This project is still under development so please read the available functions. You may encounter bugs with this pack.
 
-In order to get started, you must be on Minecraft Bedrock version 1.21.20+. Then, give yourself a **World Editor** (use /give @s we:world_editor) with the **worldeditor** tag. Right clicking the World Editor will activate it!
+In order to get started, you must be on Minecraft Bedrock version 1.21.30+. Then, give yourself a **World Editor** (use /give @s we:world_editor) with the **worldeditor** tag. Right clicking the World Editor will activate it!
 
 Current Features
 - Position Saving
